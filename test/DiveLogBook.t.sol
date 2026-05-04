@@ -3,7 +3,10 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {DiveLogRegistry} from "../src/DiveLogRegistry.sol";
-import {DiveLogBook, UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, DiveData, Environment, Decompression, GasData, DiverProfile, DiveLog} from "../src/DiveLogBook.sol";
+import {UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, BiologicalSex, DiveData, Environment, Decompression, GasData, DiverProfile, DiveLog} from "../src/interfaces/IDiveLogTypes.sol";
+import {DiveLogBook} from "../src/DiveLogBook.sol";
+import {IDiveLogBook} from "../src/interfaces/IDiveLogBook.sol";
+import {IERC165} from "../src/interfaces/IERC165.sol";
 
 contract DiveLogBookTest is Test {
     DiveLogRegistry public registry;
@@ -16,7 +19,7 @@ contract DiveLogBookTest is Test {
     function setUp() public {
         registry = new DiveLogRegistry();
         vm.prank(owner);
-        address lb = registry.registerDiver("Test Diver", 30, 72, 185, true, UnitSystem.Imperial);
+        address lb = registry.registerDiver("Test Diver", 30, 72, 185, BiologicalSex.Male, UnitSystem.Imperial);
         logBook = DiveLogBook(payable(lb));
     }
 
@@ -63,9 +66,9 @@ contract DiveLogBookTest is Test {
             o2Percent: 21,
             hePercent: 0,
             n2Percent: 79,
-            airInPsi: 3000,
-            airOutPsi: 1200,
-            airUsedPsi: 1800,
+            cylinderPressureIn: 3000,
+            cylinderPressureOut: 1200,
+            gasConsumed: 1800,
             bailoutPressure: 2800
         });
     }
@@ -89,7 +92,7 @@ contract DiveLogBookTest is Test {
     function test_logDive_emitsEvent() public {
         vm.prank(owner);
         vm.expectEmit(true, true, false, true);
-        emit DiveLogBook.DiveLogged(1, DIVE_DATE);
+        emit IDiveLogBook.DiveLogged(1, DIVE_DATE);
         logBook.logDive(
             DIVE_DATE,
             UnitSystem.Imperial,
@@ -121,7 +124,7 @@ contract DiveLogBookTest is Test {
 
     function test_revert_logDive_notOwner() public {
         vm.prank(stranger);
-        vm.expectRevert(DiveLogBook.NotOwner.selector);
+        vm.expectRevert(IDiveLogBook.NotOwner.selector);
         logBook.logDive(
             DIVE_DATE,
             UnitSystem.Imperial,
@@ -137,7 +140,7 @@ contract DiveLogBookTest is Test {
         DiveData memory data = _makeDiveData();
         data.maxDepth = 0;
         vm.prank(owner);
-        vm.expectRevert(DiveLogBook.InvalidDepth.selector);
+        vm.expectRevert(IDiveLogBook.InvalidDepth.selector);
         logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
     }
 
@@ -145,7 +148,7 @@ contract DiveLogBookTest is Test {
         DiveData memory data = _makeDiveData();
         data.maxDepth = -10;
         vm.prank(owner);
-        vm.expectRevert(DiveLogBook.InvalidDepth.selector);
+        vm.expectRevert(IDiveLogBook.InvalidDepth.selector);
         logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
     }
 
@@ -153,7 +156,7 @@ contract DiveLogBookTest is Test {
         DiveData memory data = _makeDiveData();
         data.bottomTimeMinutes = 0;
         vm.prank(owner);
-        vm.expectRevert(DiveLogBook.InvalidTimes.selector);
+        vm.expectRevert(IDiveLogBook.InvalidTimes.selector);
         logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
     }
 
@@ -190,19 +193,19 @@ contract DiveLogBookTest is Test {
         assertEq(uint256(dive.gas.gasType), uint256(BreathingGas.Air));
         assertEq(dive.gas.o2Percent, 21);
         assertEq(dive.gas.n2Percent, 79);
-        assertEq(dive.gas.airInPsi, 3000);
-        assertEq(dive.gas.airOutPsi, 1200);
-        assertEq(dive.gas.airUsedPsi, 1800);
+        assertEq(dive.gas.cylinderPressureIn, 3000);
+        assertEq(dive.gas.cylinderPressureOut, 1200);
+        assertEq(dive.gas.gasConsumed, 1800);
         assertEq(dive.remarks, "Test remarks");
     }
 
     function test_revert_getDive_notFound() public {
-        vm.expectRevert(abi.encodeWithSelector(DiveLogBook.DiveNotFound.selector, uint256(1)));
+        vm.expectRevert(abi.encodeWithSelector(IDiveLogBook.DiveNotFound.selector, uint256(1)));
         logBook.getDive(1);
     }
 
     function test_revert_getDive_zeroId() public {
-        vm.expectRevert(abi.encodeWithSelector(DiveLogBook.DiveNotFound.selector, uint256(0)));
+        vm.expectRevert(abi.encodeWithSelector(IDiveLogBook.DiveNotFound.selector, uint256(0)));
         logBook.getDive(0);
     }
 
@@ -240,6 +243,18 @@ contract DiveLogBookTest is Test {
         assertEq(dives.length, 2);
         assertEq(dives[0].id, 1);
         assertEq(dives[1].id, 2);
+    }
+
+    function test_revert_getMultipleDives_invalidId() public {
+        vm.prank(owner);
+        logBook.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 1");
+
+        uint256[] memory ids = new uint256[](2);
+        ids[0] = 1;
+        ids[1] = 99;
+
+        vm.expectRevert(abi.encodeWithSelector(IDiveLogBook.DiveNotFound.selector, uint256(99)));
+        logBook.getMultipleDives(ids);
     }
 
     function test_getAllDiveIds() public {
@@ -307,7 +322,7 @@ contract DiveLogBookTest is Test {
         dataArr[1].maxDepth = 0;
 
         vm.prank(owner);
-        vm.expectRevert(DiveLogBook.InvalidDepth.selector);
+        vm.expectRevert(IDiveLogBook.InvalidDepth.selector);
         logBook.batchLogDives(diveDates, units, dataArr, envArr, decompArr, gasArr, remarksArr);
     }
 
@@ -329,39 +344,67 @@ contract DiveLogBookTest is Test {
         remarksArr[0] = "Unauthorized";
 
         vm.prank(stranger);
-        vm.expectRevert(DiveLogBook.NotOwner.selector);
+        vm.expectRevert(IDiveLogBook.NotOwner.selector);
+        logBook.batchLogDives(diveDates, units, dataArr, envArr, decompArr, gasArr, remarksArr);
+    }
+
+    function test_batchLogDives_revert_arrayLengthMismatch() public {
+        uint64[] memory diveDates = new uint64[](2);
+        UnitSystem[] memory units = new UnitSystem[](1);
+        DiveData[] memory dataArr = new DiveData[](2);
+        Environment[] memory envArr = new Environment[](2);
+        Decompression[] memory decompArr = new Decompression[](2);
+        GasData[] memory gasArr = new GasData[](2);
+        string[] memory remarksArr = new string[](2);
+
+        diveDates[0] = DIVE_DATE;
+        diveDates[1] = DIVE_DATE + 86400;
+        units[0] = UnitSystem.Imperial;
+        dataArr[0] = _makeDiveData();
+        dataArr[1] = _makeDiveData();
+        envArr[0] = _makeEnvironment();
+        envArr[1] = _makeEnvironment();
+        decompArr[0] = _makeDecompression();
+        decompArr[1] = _makeDecompression();
+        gasArr[0] = _makeGasData();
+        gasArr[1] = _makeGasData();
+        remarksArr[0] = "A";
+        remarksArr[1] = "B";
+
+        vm.prank(owner);
+        vm.expectRevert(IDiveLogBook.ArrayLengthMismatch.selector);
         logBook.batchLogDives(diveDates, units, dataArr, envArr, decompArr, gasArr, remarksArr);
     }
 
     function test_updateProfile() public {
         vm.prank(owner);
-        logBook.updateProfile("Updated Name", 31, 73, 190, true, UnitSystem.Metric);
+        logBook.updateProfile("Updated Name", 31, 73, 190, BiologicalSex.Male, UnitSystem.Metric);
 
-        (string memory name, uint8 age, uint16 height, uint16 weight, bool isMale, UnitSystem units) = logBook.profile();
-        assertEq(name, "Updated Name");
-        assertEq(age, 31);
-        assertEq(height, 73);
-        assertEq(weight, 190);
-        assertTrue(isMale);
-        assertEq(uint256(units), uint256(UnitSystem.Metric));
+        DiverProfile memory p = logBook.profile();
+        assertEq(p.name, "Updated Name");
+        assertEq(p.age, 31);
+        assertEq(p.height, 73);
+        assertEq(p.weight, 190);
+        assertEq(uint256(p.sex), uint256(BiologicalSex.Male));
+        assertEq(uint256(p.units), uint256(UnitSystem.Metric));
     }
 
     function test_revert_updateProfile_notOwner() public {
         vm.prank(stranger);
-        vm.expectRevert(DiveLogBook.NotOwner.selector);
-        logBook.updateProfile("Hacker", 99, 99, 99, true, UnitSystem.Imperial);
+        vm.expectRevert(IDiveLogBook.NotOwner.selector);
+        logBook.updateProfile("Hacker", 99, 99, 99, BiologicalSex.Unspecified, UnitSystem.Imperial);
     }
 
     function test_metricDive() public {
         DiveData memory data = _makeDiveData();
-        data.maxDepth = 30; // 30 meters
+        data.maxDepth = 30;
 
         Environment memory env = _makeEnvironment();
         env.airTemp = 22;
         env.waterTemp = 16;
 
         GasData memory gas = _makeGasData();
-        gas.airInPsi = 2900;
+        gas.cylinderPressureIn = 2900;
         gas.gasType = BreathingGas.Nitrox;
         gas.o2Percent = 32;
         gas.n2Percent = 68;
@@ -499,5 +542,64 @@ contract DiveLogBookTest is Test {
         assertEq(uint256(dive.data.mode), uint256(DiveMode.SCUBA));
         assertEq(uint256(dive.data.purpose), uint256(DivePurpose.Recreational));
         assertEq(uint256(dive.data.suit), uint256(SuitType.Wet));
+    }
+
+    function test_supportsInterface() public {
+        DiveLogBook book = logBook;
+        assertTrue(book.supportsInterface(type(IERC165).interfaceId));
+        assertTrue(book.supportsInterface(type(IDiveLogBook).interfaceId));
+        assertFalse(book.supportsInterface(0xffffffff));
+    }
+
+    function test_profile_returnsStruct() public {
+        DiverProfile memory p = logBook.profile();
+        assertEq(p.name, "Test Diver");
+        assertEq(p.age, 30);
+        assertEq(p.height, 72);
+        assertEq(p.weight, 185);
+        assertEq(uint256(p.sex), uint256(BiologicalSex.Male));
+        assertEq(uint256(p.units), uint256(UnitSystem.Imperial));
+    }
+
+    function test_biologicalSex_allValues() public {
+        BiologicalSex[3] memory sexes = [BiologicalSex.Male, BiologicalSex.Female, BiologicalSex.Unspecified];
+
+        for (uint256 i; i < 3; i++) {
+            DiveLogRegistry reg = new DiveLogRegistry();
+            address diver = makeAddr(string(abi.encodePacked("diver", vm.toString(i))));
+            vm.prank(diver);
+            address lb = reg.registerDiver("Test", 25, 70, 170, sexes[i], UnitSystem.Imperial);
+            DiveLogBook book = DiveLogBook(payable(lb));
+
+            DiverProfile memory p = book.profile();
+            assertEq(uint256(p.sex), uint256(sexes[i]));
+        }
+    }
+
+    function testFuzz_logDive_depth(int32 depth) public {
+        vm.assume(depth > 0);
+        DiveData memory data = _makeDiveData();
+        data.maxDepth = depth;
+        vm.prank(owner);
+        uint256 id = logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+        assertEq(logBook.getDive(id).data.maxDepth, depth);
+    }
+
+    function testFuzz_logDive_bottomTime(uint32 bt) public {
+        vm.assume(bt > 0);
+        DiveData memory data = _makeDiveData();
+        data.bottomTimeMinutes = bt;
+        vm.prank(owner);
+        uint256 id = logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+        assertEq(logBook.getDive(id).data.bottomTimeMinutes, bt);
+    }
+
+    function testFuzz_logDive_revert_zeroOrNegativeDepth(int32 depth) public {
+        vm.assume(depth <= 0);
+        DiveData memory data = _makeDiveData();
+        data.maxDepth = depth;
+        vm.prank(owner);
+        vm.expectRevert(IDiveLogBook.InvalidDepth.selector);
+        logBook.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
     }
 }

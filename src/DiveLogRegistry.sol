@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
+import "./interfaces/IDiveLogTypes.sol";
+import "./interfaces/IDiveLogRegistry.sol";
 import "./DiveLogBook.sol";
 
-contract DiveLogRegistry {
+contract DiveLogRegistry is IDiveLogRegistry {
     address public immutable deployer;
 
     uint256 public totalDivers;
@@ -14,15 +16,13 @@ contract DiveLogRegistry {
 
     address[] private _allLogBooks;
 
-    event DiverRegistered(address indexed diver, address indexed logBook, uint256 diverId);
-
-    error AlreadyRegistered();
-    error NotRegistered();
-    error EmptyName();
-    error Unauthorized();
-
     constructor() {
         deployer = msg.sender;
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+        return interfaceId == type(IERC165).interfaceId
+            || interfaceId == type(IDiveLogRegistry).interfaceId;
     }
 
     function registerDiver(
@@ -30,7 +30,7 @@ contract DiveLogRegistry {
         uint8 _age,
         uint16 _height,
         uint16 _weight,
-        bool _isMale,
+        BiologicalSex _sex,
         UnitSystem _units
     ) external returns (address) {
         if (isRegistered[msg.sender]) revert AlreadyRegistered();
@@ -42,7 +42,7 @@ contract DiveLogRegistry {
             _age,
             _height,
             _weight,
-            _isMale,
+            _sex,
             _units
         );
 

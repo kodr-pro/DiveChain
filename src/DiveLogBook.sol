@@ -1,107 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-enum UnitSystem { Imperial, Metric }
-enum DiveMode { SSA, SCUBA }
-enum BreathingGas { Air, Nitrox, Heliox, Trimix, Oxygen, Mixed }
-enum DivePurpose {
-    Training, Inspection, Repair, Search, Salvage,
-    Recovery, Construction, Research, EOD, Security,
-    Photographic, Recreational, Other
-}
-enum SuitType { Wet, Dry, HotWater, Swim }
-enum DecompressionType { NoneDecomp, Standard, SurfaceDecompO2, SurfaceDecompAir, Saturation, Repetitive, ExceptionalExposure }
+import "./interfaces/IDiveLogTypes.sol";
+import "./interfaces/IDiveLogBook.sol";
 
-struct DiveLog {
-    uint256 id;
-    uint64 diveDate;
-    UnitSystem units;
-    DiveData data;
-    Environment env;
-    Decompression decomp;
-    GasData gas;
-    string remarks;
-}
-
-struct DiveData {
-    uint32 leaveSurfaceTime;
-    uint32 leaveBottomTime;
-    uint32 reachSurfaceTime;
-    uint32 bottomTimeMinutes;
-    int32 maxDepth;
-    int32 averageDepth;
-    DiveMode mode;
-    DivePurpose purpose;
-    SuitType suit;
-}
-
-struct Environment {
-    int32 airTemp;
-    int32 waterTemp;
-    int16 currentKnots;
-    string location;
-    string bottomType;
-    string weatherConditions;
-}
-
-struct Decompression {
-    DecompressionType decompType;
-    uint32 totalDecompTimeMinutes;
-    int32 maxDepthAttained;
-    bytes32 tableSchedule;
-    bytes1 repetitiveGroup;
-    uint32 surfaceIntervalMinutes;
-    bytes1 newRepetitiveGroup;
-}
-
-struct GasData {
-    BreathingGas gasType;
-    uint16 o2Percent;
-    uint16 hePercent;
-    uint16 n2Percent;
-    uint32 airInPsi;
-    uint32 airOutPsi;
-    uint32 airUsedPsi;
-    uint32 bailoutPressure;
-}
-
-struct DiverProfile {
-    string name;
-    uint8 age;
-    uint16 height;
-    uint16 weight;
-    bool isMale;
-    UnitSystem units;
-}
-
-contract DiveLogBook {
+contract DiveLogBook is IDiveLogBook {
     address public immutable owner;
     address public immutable registry;
 
-    DiverProfile public profile;
+    DiverProfile internal _profile;
     uint256 public diveCount;
 
     mapping(uint256 => DiveLog) private _dives;
     mapping(uint64 => uint256[]) private _divesByDate;
-
-    event DiveLogged(uint256 indexed diveId, uint64 indexed diveDate);
-    event ProfileUpdated();
-
-    error NotOwner();
-    error NotRegistry();
-    error InvalidDepth();
-    error InvalidTimes();
-    error DiveNotFound(uint256 diveId);
-
-    modifier onlyOwner() {
-        if (msg.sender != owner) revert NotOwner();
-        _;
-    }
-
-    modifier onlyRegistry() {
-        if (msg.sender != registry) revert NotRegistry();
-        _;
-    }
 
     constructor(
         address _owner,
@@ -109,19 +20,29 @@ contract DiveLogBook {
         uint8 _age,
         uint16 _height,
         uint16 _weight,
-        bool _isMale,
+        BiologicalSex _sex,
         UnitSystem _units
     ) {
         owner = _owner;
         registry = msg.sender;
-        profile = DiverProfile({
+        _profile = DiverProfile({
             name: _name,
             age: _age,
             height: _height,
             weight: _weight,
-            isMale: _isMale,
+            sex: _sex,
             units: _units
         });
+    }
+
+    function supportsInterface(bytes4 interfaceId) external pure override returns (bool) {
+        return interfaceId == type(IERC165).interfaceId
+            || interfaceId == type(IDiveLogBook).interfaceId;
+    }
+
+    modifier onlyOwner() {
+        if (msg.sender != owner) revert NotOwner();
+        _;
     }
 
     function logDive(
@@ -165,6 +86,11 @@ contract DiveLogBook {
         string[] calldata remarksArr
     ) external onlyOwner returns (uint256[] memory) {
         uint256 len = diveDates.length;
+        if (units.length != len || dataArr.length != len || envArr.length != len
+            || decompArr.length != len || gasArr.length != len || remarksArr.length != len) {
+            revert ArrayLengthMismatch();
+        }
+
         uint256[] memory ids = new uint256[](len);
 
         for (uint256 i; i < len; ) {
@@ -208,6 +134,7 @@ contract DiveLogBook {
         uint256 len = diveIds.length;
         DiveLog[] memory dives = new DiveLog[](len);
         for (uint256 i; i < len; ) {
+            if (diveIds[i] == 0 || diveIds[i] > diveCount) revert DiveNotFound(diveIds[i]);
             dives[i] = _dives[diveIds[i]];
             unchecked { ++i; }
         }
@@ -224,20 +151,24 @@ contract DiveLogBook {
         return ids;
     }
 
+    function profile() external view override returns (DiverProfile memory) {
+        return _profile;
+    }
+
     function updateProfile(
         string calldata _name,
         uint8 _age,
         uint16 _height,
         uint16 _weight,
-        bool _isMale,
+        BiologicalSex _sex,
         UnitSystem _units
     ) external onlyOwner {
-        profile = DiverProfile({
+        _profile = DiverProfile({
             name: _name,
             age: _age,
             height: _height,
             weight: _weight,
-            isMale: _isMale,
+            sex: _sex,
             units: _units
         });
         emit ProfileUpdated();

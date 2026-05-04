@@ -22,7 +22,7 @@ Divechain stores dive logs as EVM smart contract data. Each diver gets their own
 DiveLogRegistry (factory)
   |
   +-- DiveLogBook (deployed per-diver)
-  |     |-- DiverProfile (name, age, height, weight, units)
+  |     |-- DiverProfile (name, age, height, weight, sex, units)
   |     |-- DiveLog[] (append-only log entries)
   |     |-- Decompression data per dive
   |     |-- Gas mixture data per dive
@@ -63,11 +63,18 @@ Every dive and every diver profile carries a `UnitSystem` enum (`Imperial` or `M
 ```
 Divechain/
 ├── src/
+│   ├── interfaces/
+│   │   ├── IDiveLogTypes.sol    # Shared enums and structs
+│   │   ├── IDiveLogBook.sol     # Log book interface
+│   │   ├── IDiveLogRegistry.sol # Registry interface
+│   │   └── IERC165.sol          # ERC-165 interface
 │   ├── DiveLogBook.sol          # Per-diver log storage contract
 │   └── DiveLogRegistry.sol      # Factory/registry contract
 ├── script/
 │   └── Deploy.s.sol             # Deployment script
-├── test/                        # Tests
+├── test/
+│   ├── DiveLogBook.t.sol        # Log book tests + fuzz tests
+│   └── DiveLogRegistry.t.sol    # Registry tests
 ├── docs/
 │   ├── EIP-dive-log-standard.md # EIP standard proposal
 │   └── DIVE_DATA_STANDARD.md    # Field definitions and conventions
@@ -106,7 +113,7 @@ address myLogBook = registry.registerDiver(
     32,                // age
     71,                // height (inches or cm per UnitSystem)
     185,               // weight (lbs or kg per UnitSystem)
-    true,              // isMale
+    BiologicalSex.Male,// sex
     UnitSystem.Imperial
 );
 ```
@@ -126,7 +133,7 @@ logBook.logDive(
         bottomTimeMinutes: 14,
         maxDepth: 95,
         averageDepth: 75,
-        mode: DiveMode.SSDS,     // <-- this is actually DiveMode.SSA
+        mode: DiveMode.SSA,
         purpose: DivePurpose.Inspection,
         suit: SuitType.Dry
     }),
@@ -152,9 +159,9 @@ logBook.logDive(
         o2Percent: 21,
         hePercent: 0,
         n2Percent: 79,
-        airInPsi: 3000,
-        airOutPsi: 1200,
-        airUsedPsi: 1800,
+        cylinderPressureIn: 3000,
+        cylinderPressureOut: 1200,
+        gasConsumed: 1800,
         bailoutPressure: 2800
     }),
     "Hull inspection, starboard side. Good visibility."  // remarks
@@ -175,6 +182,9 @@ uint256[] memory ids = logBook.getDivesByDate(1714521600);
 
 // Get multiple dives at once
 DiveLog[] memory dives = logBook.getMultipleDives(ids);
+
+// Get diver profile
+DiverProfile memory p = logBook.profile();
 ```
 
 ## License

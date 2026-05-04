@@ -62,11 +62,19 @@ Set at registration, updatable by the owner.
 | Field | Type | Source | Description |
 |-------|------|--------|-------------|
 | `name` | `string` | DD2544 Block 5, ENG4615 Block 1 | Full name in "Last, First, Middle Initial" format |
-| `age` | `uint8` | DD2544 Block 6 | Age at time of registration. Range: 0–255 |
+| `age` | `uint8` | DD2544 Block 6 | Age at time of last profile update. Range: 0–255. Consumers SHOULD treat this as "age at time of last `updateProfile()` call" |
 | `height` | `uint16` | DD2544 Block 7 | Inches (Imperial) or centimeters (Metric) |
 | `weight` | `uint16` | DD2544 Block 8 | Pounds (Imperial) or kilograms (Metric) |
-| `isMale` | `bool` | DD2544 Block 9 | `true` = Male, `false` = Female |
+| `sex` | `BiologicalSex` | DD2544 Block 9 | `Male` (0), `Female` (1), or `Unspecified` (2) |
 | `units` | `UnitSystem` | — | Default unit system for display. Individual dives may override |
+
+### BiologicalSex Enum
+
+| Value | Name | Description |
+|-------|------|-------------|
+| 0 | `Male` | Male |
+| 1 | `Female` | Female |
+| 2 | `Unspecified` | Not disclosed |
 
 ---
 
@@ -130,7 +138,7 @@ Environmental conditions at the dive site. All fields optional — zero values o
 |-------|------|-----------------|------------------|-------------|
 | `airTemp` | `int32` | Block 14 "Air Temp" | Block 15 "Air" | Air temperature. °F or °C per unit system. Signed for sub-zero |
 | `waterTemp` | `int32` | Block 15 "Water Temp" | Block 15 "Water" | Water temperature at dive site. °F or °C per unit system |
-| `currentKnots` | `int16` | — | Block 10 "Current" | Water current speed in knots |
+| `currentKnots` | `int16` | — | Block 10 "Current" | Water current speed in knots (unit-system-independent) |
 | `location` | `string` | Block 16 "Dive Location" | Block 6 "Location of Dive" | Human-readable location name |
 | `bottomType` | `string` | — | Block 11 "Bottom Type" | Bottom composition: "Mud", "Sand", "Coral", "Rock", "Concrete", "Silt", etc. |
 | `weatherConditions` | `string` | — | Block 8 "Weather Conditions" | Weather description. ENG4615 options: Clear, Cloudy, Drizzle, Rain, Snow, Sleet, Freezing/Ice, Hot/Humid, Wind |
@@ -175,10 +183,10 @@ Breathing gas composition and consumption. Maps to DD2544 Block 26 and ENG4615 B
 | `o2Percent` | `uint16` | Block 26 "O2" | — | Oxygen fraction, 0–100. Air = 21, Nitrox32 = 32 |
 | `hePercent` | `uint16` | Block 26 "He" | — | Helium fraction, 0–100. 0 for air/nitrox |
 | `n2Percent` | `uint16` | Block 26 "N2" | — | Nitrogen fraction, 0–100. Air = 79. 0 for closed circuit O2 |
-| `airInPsi` | `uint32` | — | Block 29 "Air In" | Cylinder pressure at start of dive. PSI (Imperial) or Bar × 14.5038 (Metric) |
-| `airOutPsi` | `uint32` | — | Block 30 "Air Out" | Cylinder pressure at end of dive. Same unit convention |
-| `airUsedPsi` | `uint32` | — | Block 31 "Total Air Used" | Gas consumed = airIn − airOut. Stored directly for gas savings |
-| `bailoutPressure` | `uint32` | — | Block 16 "Bailout Bottle Pressure" | Emergency bailout cylinder pressure. 0 = not applicable or not recorded |
+| `cylinderPressureIn` | `uint32` | — | Block 29 "Air In" | Cylinder pressure at start of dive. PSI (Imperial) or Bar (Metric) per dive's UnitSystem |
+| `cylinderPressureOut` | `uint32` | — | Block 30 "Air Out" | Cylinder pressure at end of dive. Same unit convention |
+| `gasConsumed` | `uint32` | — | Block 31 "Total Air Used" | Gas consumed = cylinderPressureIn − cylinderPressureOut. Stored directly for gas savings |
+| `bailoutPressure` | `uint32` | — | Block 16 "Bailout Bottle Pressure" | Emergency bailout cylinder pressure. 0 = not applicable or not recorded. Same unit convention |
 
 ### BreathingGas Enum
 
@@ -222,6 +230,7 @@ The following invariants MUST hold for any dive log stored on-chain:
 6. **Repetitive group**: Single ASCII uppercase letter (A–Z), or 0x00 if not applicable.
 7. **Append-only**: No dive, once logged, may be deleted or modified.
 8. **Ownership**: Only the contract owner (the diver who registered) may log dives or update the profile.
+9. **Array lengths**: `batchLogDives` MUST receive arrays of equal length or revert.
 
 ---
 
@@ -236,10 +245,10 @@ For implementors who need to map DD2544 fields to this standard:
 | Block 3 — Activity Name | `Environment.location` | |
 | Block 4 — SSN | Not included | Privacy — DO NOT store on-chain |
 | Block 5 — Name | `DiverProfile.name` | |
-| Block 6 — Age | `DiverProfile.age` | |
+| Block 6 — Age | `DiverProfile.age` | Age at last profile update |
 | Block 7 — Height | `DiverProfile.height` | |
 | Block 8 — Weight | `DiverProfile.weight` | |
-| Block 9 — Sex | `DiverProfile.isMale` | |
+| Block 9 — Sex | `DiverProfile.sex` | `BiologicalSex` enum |
 | Block 10 — Service | Not included | Military-specific |
 | Block 11 — NOBC/NEC | Not included | Military-specific |
 | Block 14 — Air Temp | `Environment.airTemp` | |
@@ -299,9 +308,9 @@ For implementors who need to map DD2544 fields to this standard:
 | Block 26 — Repetitive Group | `Decompression.repetitiveGroup` | |
 | Block 27 — Surface Interval | `Decompression.surfaceIntervalMinutes` | |
 | Block 28 — New Repetitive Group | `Decompression.newRepetitiveGroup` | |
-| Block 29 — Air In | `GasData.airInPsi` | |
-| Block 30 — Air Out | `GasData.airOutPsi` | |
-| Block 31 — Total Air Used | `GasData.airUsedPsi` | |
+| Block 29 — Air In | `GasData.cylinderPressureIn` | PSI or Bar per UnitSystem |
+| Block 30 — Air Out | `GasData.cylinderPressureOut` | PSI or Bar per UnitSystem |
+| Block 31 — Total Air Used | `GasData.gasConsumed` | PSI or Bar per UnitSystem |
 | Block 32 — Work/Remarks | `DiveLog.remarks` | |
 | Block 33 — Signatures | Not included | On-chain tx serves as signature |
 
