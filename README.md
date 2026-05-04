@@ -43,7 +43,7 @@ The dive log schema is derived from two U.S. military diving log standards:
 - **DD Form 2544** (Feb 2025) — U.S. Navy Diving Log, NAVSEA/Naval Safety Center
 - **ENG Form 4615** (Feb 2021) — U.S. Army Corps of Engineers Dive Log, ER 385-1-86
 
-See [docs/EIP-dive-log-standard.md](docs/EIP-dive-log-standard.md) for the full EIP-style specification and [docs/DIVE_DATA_STANDARD.md](docs/DIVE_DATA_STANDARD.md) for field-level documentation.
+See [docs/ERC-dive-log-standard.md](docs/ERC-dive-log-standard.md) for the full ERC specification and [docs/dive-data-standard.md](docs/dive-data-standard.md) for field-level documentation.
 
 ### Unit Systems
 
@@ -76,8 +76,8 @@ Divechain/
 │   ├── DiveLogBook.t.sol        # Log book tests + fuzz tests
 │   └── DiveLogRegistry.t.sol    # Registry tests
 ├── docs/
-│   ├── EIP-dive-log-standard.md # EIP standard proposal
-│   └── DIVE_DATA_STANDARD.md    # Field definitions and conventions
+│   ├── ERC-dive-log-standard.md  # ERC standard proposal
+│   └── dive-data-standard.md     # Field definitions and conventions
 ├── references/                  # Source military dive log forms (PDF)
 └── foundry.toml
 ```
