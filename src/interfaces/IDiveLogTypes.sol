@@ -1,25 +1,62 @@
 // SPDX-License-Identifier: CC0-1.0
 pragma solidity ^0.8.20;
 
-enum UnitSystem { Imperial, Metric }
-
-enum DiveMode { SSA, SCUBA }
-
-enum BreathingGas { Air, Nitrox, Heliox, Trimix, Oxygen, Mixed }
-
-enum BiologicalSex { Male, Female, Unspecified }
-
-enum DivePurpose {
-    Training, Inspection, Repair, Search, Salvage,
-    Recovery, Construction, Research, EOD, Security,
-    Photographic, Recreational, Other
+enum UnitSystem {
+    Imperial,
+    Metric
 }
 
-enum SuitType { Wet, Dry, HotWater, Swim }
+enum DiveMode {
+    SSA,
+    SCUBA
+}
+
+enum BreathingGas {
+    Air,
+    Nitrox,
+    Heliox,
+    Trimix,
+    Oxygen,
+    Mixed
+}
+
+enum BiologicalSex {
+    Male,
+    Female,
+    Unspecified
+}
+
+enum DivePurpose {
+    Training,
+    Inspection,
+    Repair,
+    Search,
+    Salvage,
+    Recovery,
+    Construction,
+    Research,
+    EOD,
+    Security,
+    Photographic,
+    Recreational,
+    Other
+}
+
+enum SuitType {
+    Wet,
+    Dry,
+    HotWater,
+    Swim
+}
 
 enum DecompressionType {
-    NoneDecomp, Standard, SurfaceDecompO2, SurfaceDecompAir,
-    Saturation, Repetitive, ExceptionalExposure
+    NoneDecomp,
+    Standard,
+    SurfaceDecompO2,
+    SurfaceDecompAir,
+    Saturation,
+    Repetitive,
+    ExceptionalExposure
 }
 
 struct DiveData {
@@ -82,4 +119,17 @@ struct DiveLog {
     Decompression decomp;
     GasData gas;
     string remarks;
+}
+
+struct VoidInfo {
+    bool isVoided;
+    uint256 supersededById;
+    address voidedBy;
+    uint64 voidedAt;
+    string reason;
+}
+
+struct Attestation {
+    address attester;
+    uint64 attestedAt;
 }

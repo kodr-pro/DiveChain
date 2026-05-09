@@ -218,6 +218,52 @@ Top-level container assembled from the above structures.
 
 ---
 
+## Void Info (VoidInfo struct)
+
+Corrective ledger data for the Void/Supersede mechanism. Dive logs are never edited or deleted — instead, they are voided with an optional superseding dive reference.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `isVoided` | `bool` | Whether this dive has been voided |
+| `supersededById` | `uint256` | ID of the dive that supersedes this one. 0 = voided without replacement |
+| `voidedBy` | `address` | Address that initiated the void operation |
+| `voidedAt` | `uint64` | Unix timestamp when the dive was voided |
+| `reason` | `string` | Human-readable explanation for the void (e.g., "Incorrect depth recorded", "Duplicate entry") |
+
+### Void/Supersede Flow
+
+1. Diver logs dive #5 (contains an error)
+2. Diver logs corrected dive #6
+3. Diver calls `voidDive(5, 6, "Incorrect depth recorded")` — marks #5 as superseded by #6
+4. Dive #5 data remains readable via `getDive(5)`, but `isDiveVoided(5)` returns `true`
+5. `getVoidInfo(5)` returns the full void record including the reason and link to #6
+
+A dive MAY be voided without a superseding dive (`supersededById == 0`) for cases like duplicate entries.
+
+---
+
+## Attestation (Attestation struct)
+
+Cryptographic buddy/instructor sign-off record. Created when a third party signs the dive data via EIP-712 and the signature is submitted on-chain.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `attester` | `address` | Address of the signer (recovered from EIP-712 signature) |
+| `attestedAt` | `uint64` | Unix timestamp when the attestation was recorded on-chain |
+
+### EIP-712 Attestation Signing
+
+An attester signs the following EIP-712 typed data:
+
+```
+Domain: { name: "DiveLog", version: "1", chainId: <chainId>, verifyingContract: <diveLogAddress> }
+Type: Attestation(uint256 diveId, address verifyingContract)
+```
+
+This binds the attestation to a specific dive on a specific contract on a specific chain, preventing replay attacks.
+
+---
+
 ## Validation Rules
 
 The following invariants MUST hold for any dive log stored on-chain:
@@ -228,9 +274,14 @@ The following invariants MUST hold for any dive log stored on-chain:
 4. **Timestamps**: `leaveSurfaceTime` < `leaveBottomTime` < `reachSurfaceTime` (SHOULD, not enforced on-chain for gas efficiency).
 5. **Gas percentages**: `o2Percent + hePercent + n2Percent` SHOULD total ≤ 100. Trace gases are omitted.
 6. **Repetitive group**: Single ASCII uppercase letter (A–Z), or 0x00 if not applicable.
-7. **Append-only**: No dive, once logged, may be deleted or modified.
-8. **Ownership**: Only the contract owner (the diver who registered) may log dives or update the profile.
+7. **Append-only**: No dive, once logged, may be deleted or modified. Corrections use the Void/Supersede mechanism.
+8. **Ownership**: Only the contract owner (the diver) may log dives, void dives, or update the profile.
 9. **Array lengths**: `batchLogDives` MUST receive arrays of equal length or revert.
+10. **Void immutability**: A voided dive cannot be un-voided or re-voided.
+11. **Supersede validity**: If `supersededById > 0`, it MUST reference an existing dive that is not the dive being voided.
+12. **Attestation uniqueness**: Each address MAY attest a given dive exactly once.
+13. **Attestation on non-voided dives**: Attestations on voided dives MUST revert.
+14. **Signature recovery**: Attestation signatures MUST recover to a valid (non-zero) Ethereum address.
 
 ---
 
