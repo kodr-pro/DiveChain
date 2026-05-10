@@ -1,6 +1,7 @@
-import { useState } from "react";
-import { useAccount, useDeployContract, useWaitForTransactionReceipt } from "wagmi";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAccount, useDeployContract, useWaitForTransactionReceipt, useTransactionReceipt } from "wagmi";
+import { useDiveContract } from "../contexts/DiveContractContext";
 import {
   SOVEREIGN_DIVE_LOG_ABI,
   SOVEREIGN_DIVE_LOG_BYTECODE,
@@ -12,7 +13,8 @@ import {
 
 export default function Deploy() {
   const { address } = useAccount();
-  const [_setContractAddress] = useLocalStorage<string>("divechain_contract", "");
+  const navigate = useNavigate();
+  const { hasContract, setContract, contractAddress } = useDiveContract();
 
   const [name, setName] = useState("");
   const [age, setAge] = useState(30);
@@ -27,65 +29,92 @@ export default function Deploy() {
     hash: txHash,
   });
 
-  const handleDeploy = () => {
-    if (!address) return;
-    deployContract({
-      abi: SOVEREIGN_DIVE_LOG_ABI,
-      bytecode: SOVEREIGN_DIVE_LOG_BYTECODE,
-      args: [address, name, age, height, weight, sex, units],
-    });
-  };
+  const { data: receipt } = useTransactionReceipt({ hash: txHash });
+
+  useEffect(() => {
+    if (receipt?.contractAddress) {
+      setContract(receipt.contractAddress);
+      navigate("/logbook", { replace: true });
+    }
+  }, [receipt, setContract, navigate]);
+
+  if (hasContract) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-12">
+        <div className="glass-card p-8">
+          <div className="text-5xl mb-4">🐬</div>
+          <h2 className="text-xl font-bold text-white mb-2">You already have a dive log</h2>
+          <p className="text-sm text-gray-400 mb-6">
+            Your logbook is deployed at <code className="text-bismuth text-xs">{contractAddress}</code>
+          </p>
+          <button
+            onClick={() => navigate("/logbook", { replace: true })}
+            className="btn-primary"
+          >
+            Open My Logbook
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="max-w-lg mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-6">Deploy Sovereign Dive Log</h1>
+      <div className="mb-8">
+        <h1 className="text-2xl font-bold text-white mb-2">Create Your Dive Log</h1>
+        <p className="text-sm text-gray-400">
+          Deploy your personal, sovereign dive logbook on Avalanche. One per wallet.
+        </p>
+      </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
+      <div className="glass-card p-6 space-y-5">
+        <div className="section-title">Diver Information</div>
+
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Diver Name</label>
+          <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Full Name</label>
           <input
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
             placeholder="Enter your name"
+            required
           />
         </div>
 
         <div className="grid grid-cols-2 gap-4">
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Age</label>
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Age</label>
             <input
               type="number"
               value={age}
               onChange={(e) => setAge(Number(e.target.value))}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Height ({units === UnitSystem.Metric ? "cm" : "in"})</label>
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
+              Height ({units === UnitSystem.Metric ? "cm" : "in"})
+            </label>
             <input
               type="number"
               value={height}
               onChange={(e) => setHeight(Number(e.target.value))}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Weight ({units === UnitSystem.Metric ? "kg" : "lbs"})</label>
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
+              Weight ({units === UnitSystem.Metric ? "kg" : "lbs"})
+            </label>
             <input
               type="number"
               value={weight}
               onChange={(e) => setWeight(Number(e.target.value))}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Unit System</label>
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Unit System</label>
             <select
               value={units}
               onChange={(e) => setUnits(Number(e.target.value) as UnitSystem)}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
             >
               {Object.entries(UNIT_SYSTEM_LABELS).map(([val, label]) => (
                 <option key={val} value={val}>{label}</option>
@@ -95,11 +124,10 @@ export default function Deploy() {
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Biological Sex</label>
+          <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Biological Sex</label>
           <select
             value={sex}
             onChange={(e) => setSex(Number(e.target.value) as BiologicalSex)}
-            className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
           >
             {Object.entries(BIOLOGICAL_SEX_LABELS).map(([val, label]) => (
               <option key={val} value={val}>{label}</option>
@@ -107,25 +135,30 @@ export default function Deploy() {
           </select>
         </div>
 
-        <button
-          onClick={handleDeploy}
-          disabled={isPending || isConfirming || !name}
-          className="w-full py-3 rounded-xl bg-teal text-white font-semibold hover:bg-teal/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-        >
-          {isPending ? "Confirm in Wallet..." : isConfirming ? "Deploying..." : "Deploy Contract"}
-        </button>
+        <div className="pt-2">
+          <button
+            onClick={() => {
+              if (!address) return;
+              deployContract({
+                abi: SOVEREIGN_DIVE_LOG_ABI,
+                bytecode: SOVEREIGN_DIVE_LOG_BYTECODE,
+                args: [address, name, age, height, weight, sex, units],
+              });
+            }}
+            disabled={isPending || isConfirming || !name}
+            className="btn-primary w-full text-center"
+          >
+            {isPending ? "Confirm in Wallet..." : isConfirming ? "Deploying to Avalanche..." : "Deploy My Dive Log"}
+          </button>
+        </div>
 
         {error && (
-          <p className="text-sm text-danger">{error.message}</p>
+          <p className="text-sm text-danger text-center">{error.message}</p>
         )}
 
-        {isSuccess && txHash && (
-          <div className="bg-kelp/10 border border-kelp/30 rounded-lg p-3">
-            <p className="text-sm text-kelp font-medium">Contract deployed!</p>
-            <p className="text-xs text-gray-400 mt-1 break-all">TX: {txHash}</p>
-            <p className="text-xs text-gray-400 mt-2">
-              Find your contract address from the transaction receipt and set it in the Profile page.
-            </p>
+        {isSuccess && !receipt?.contractAddress && (
+          <div className="glass-card-inner p-4 text-center">
+            <p className="text-sm text-bismuth animate-pulse">Confirming deployment...</p>
           </div>
         )}
       </div>

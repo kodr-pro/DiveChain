@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useDiveContract } from "../contexts/DiveContractContext";
 import { useDiveLog } from "../hooks/useDiveLog";
 import {
   UnitSystem,
@@ -19,10 +19,8 @@ import {
 
 export default function LogDive() {
   const navigate = useNavigate();
-  const [contractAddress] = useLocalStorage<string>("divechain_contract", "");
-  const { logDive, isPending, isConfirming, isSuccess, error } = useDiveLog(
-    contractAddress as `0x${string}` | undefined,
-  );
+  const { hasContract, contractAddress } = useDiveContract();
+  const { logDive, isPending, isConfirming, isSuccess, error } = useDiveLog(contractAddress);
 
   const [diveDate, setDiveDate] = useState("");
   const [units, setUnits] = useState<UnitSystem>(UnitSystem.Metric);
@@ -46,7 +44,7 @@ export default function LogDive() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!contractAddress || !diveDate) return;
+    if (!hasContract || !diveDate) return;
 
     const dateSeconds = BigInt(Math.floor(new Date(diveDate).getTime() / 1000));
 
@@ -95,40 +93,39 @@ export default function LogDive() {
     });
   };
 
-  if (!contractAddress) {
+  if (!hasContract) {
     return (
-      <div className="text-center py-20">
-        <p className="text-gray-400">No dive log contract configured. Deploy one first.</p>
+      <div className="max-w-md mx-auto text-center py-16">
+        <div className="glass-card p-8">
+          <div className="text-5xl mb-4">🌊</div>
+          <p className="text-gray-400 mb-6">No dive log found. Deploy one first.</p>
+          <button onClick={() => navigate("/deploy")} className="btn-primary">
+            Create Dive Log
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="max-w-2xl mx-auto">
-      <h1 className="text-2xl font-bold text-white mb-6">Log a Dive</h1>
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-white">Log a Dive</h1>
+        <p className="text-xs text-gray-500 mt-1">Record your dive data on-chain, permanently.</p>
+      </div>
 
-      <form onSubmit={handleSubmit} className="space-y-6">
-        <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-surf">Basic Info</h2>
+      <form onSubmit={handleSubmit} className="space-y-5">
+        <div className="glass-card p-6 space-y-4">
+          <div className="section-title">Basic Info</div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Dive Date</label>
-              <input
-                type="date"
-                value={diveDate}
-                onChange={(e) => setDiveDate(e.target.value)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-                required
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Dive Date</label>
+              <input type="date" value={diveDate} onChange={(e) => setDiveDate(e.target.value)} required />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Unit System</label>
-              <select
-                value={units}
-                onChange={(e) => setUnits(Number(e.target.value) as UnitSystem)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              >
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Unit System</label>
+              <select value={units} onChange={(e) => setUnits(Number(e.target.value) as UnitSystem)}>
                 {Object.entries(UNIT_SYSTEM_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
@@ -138,24 +135,16 @@ export default function LogDive() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Mode</label>
-              <select
-                value={mode}
-                onChange={(e) => setMode(Number(e.target.value) as DiveMode)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              >
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Mode</label>
+              <select value={mode} onChange={(e) => setMode(Number(e.target.value) as DiveMode)}>
                 {Object.entries(DIVE_MODE_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Purpose</label>
-              <select
-                value={purpose}
-                onChange={(e) => setPurpose(Number(e.target.value) as DivePurpose)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              >
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Purpose</label>
+              <select value={purpose} onChange={(e) => setPurpose(Number(e.target.value) as DivePurpose)}>
                 {Object.entries(DIVE_PURPOSE_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
@@ -164,52 +153,31 @@ export default function LogDive() {
           </div>
         </div>
 
-        <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-surf">Dive Data</h2>
+        <div className="glass-card p-6 space-y-4">
+          <div className="section-title">Dive Data</div>
 
           <div className="grid grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
                 Max Depth ({units === UnitSystem.Metric ? "m" : "ft"})
               </label>
-              <input
-                type="number"
-                value={maxDepth}
-                onChange={(e) => setMaxDepth(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-                required
-              />
+              <input type="number" value={maxDepth} onChange={(e) => setMaxDepth(Number(e.target.value))} required />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
                 Avg Depth ({units === UnitSystem.Metric ? "m" : "ft"})
               </label>
-              <input
-                type="number"
-                value={averageDepth}
-                onChange={(e) => setAverageDepth(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <input type="number" value={averageDepth} onChange={(e) => setAverageDepth(Number(e.target.value))} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Bottom Time (min)</label>
-              <input
-                type="number"
-                value={bottomTimeMinutes}
-                onChange={(e) => setBottomTimeMinutes(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-                required
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Bottom Time (min)</label>
+              <input type="number" value={bottomTimeMinutes} onChange={(e) => setBottomTimeMinutes(Number(e.target.value))} required />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Suit Type</label>
-            <select
-              value={suit}
-              onChange={(e) => setSuit(Number(e.target.value) as SuitType)}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-            >
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Suit Type</label>
+            <select value={suit} onChange={(e) => setSuit(Number(e.target.value) as SuitType)}>
               {Object.entries(SUIT_TYPE_LABELS).map(([val, label]) => (
                 <option key={val} value={val}>{label}</option>
               ))}
@@ -217,88 +185,56 @@ export default function LogDive() {
           </div>
         </div>
 
-        <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-surf">Environment</h2>
+        <div className="glass-card p-6 space-y-4">
+          <div className="section-title">Environment</div>
 
           <div>
-            <label className="block text-sm text-gray-400 mb-1">Location</label>
-            <input
-              type="text"
-              value={location}
-              onChange={(e) => setLocation(e.target.value)}
-              className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              placeholder="e.g. Great Barrier Reef"
-            />
+            <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Location</label>
+            <input type="text" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Great Barrier Reef, Australia" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Water Temp ({units === UnitSystem.Metric ? "°C" : "°F"})</label>
-              <input
-                type="number"
-                value={waterTemp}
-                onChange={(e) => setWaterTemp(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
+                Water Temp ({units === UnitSystem.Metric ? "\u00B0C" : "\u00B0F"})
+              </label>
+              <input type="number" value={waterTemp} onChange={(e) => setWaterTemp(Number(e.target.value))} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Air Temp ({units === UnitSystem.Metric ? "°C" : "°F"})</label>
-              <input
-                type="number"
-                value={airTemp}
-                onChange={(e) => setAirTemp(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">
+                Air Temp ({units === UnitSystem.Metric ? "\u00B0C" : "\u00B0F"})
+              </label>
+              <input type="number" value={airTemp} onChange={(e) => setAirTemp(Number(e.target.value))} />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Bottom Type</label>
-              <input
-                type="text"
-                value={bottomType}
-                onChange={(e) => setBottomType(e.target.value)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-                placeholder="e.g. Sand, Coral, Rock"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Bottom Type</label>
+              <input type="text" value={bottomType} onChange={(e) => setBottomType(e.target.value)} placeholder="Sand, Coral, Rock..." />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Weather</label>
-              <input
-                type="text"
-                value={weatherConditions}
-                onChange={(e) => setWeatherConditions(e.target.value)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-                placeholder="e.g. Clear, Overcast"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Weather</label>
+              <input type="text" value={weatherConditions} onChange={(e) => setWeatherConditions(e.target.value)} placeholder="Clear, Overcast..." />
             </div>
           </div>
         </div>
 
-        <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-surf">Gas & Decompression</h2>
+        <div className="glass-card p-6 space-y-4">
+          <div className="section-title">Gas & Decompression</div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Breathing Gas</label>
-              <select
-                value={gasType}
-                onChange={(e) => setGasType(Number(e.target.value) as BreathingGas)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              >
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Breathing Gas</label>
+              <select value={gasType} onChange={(e) => setGasType(Number(e.target.value) as BreathingGas)}>
                 {Object.entries(BREATHING_GAS_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
               </select>
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Decompression Type</label>
-              <select
-                value={decompType}
-                onChange={(e) => setDecompType(Number(e.target.value) as DecompressionType)}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              >
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Decompression</label>
+              <select value={decompType} onChange={(e) => setDecompType(Number(e.target.value) as DecompressionType)}>
                 {Object.entries(DECOMP_TYPE_LABELS).map(([val, label]) => (
                   <option key={val} value={val}>{label}</option>
                 ))}
@@ -308,71 +244,52 @@ export default function LogDive() {
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-gray-400 mb-1">O2 %</label>
-              <input
-                type="number"
-                value={o2Percent}
-                onChange={(e) => setO2Percent(Number(e.target.value))}
-                min={0}
-                max={100}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">O2 %</label>
+              <input type="number" value={o2Percent} onChange={(e) => setO2Percent(Number(e.target.value))} min={0} max={100} />
             </div>
             <div>
-              <label className="block text-sm text-gray-400 mb-1">He %</label>
-              <input
-                type="number"
-                value={hePercent}
-                onChange={(e) => setHePercent(Number(e.target.value))}
-                min={0}
-                max={100}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">He %</label>
+              <input type="number" value={hePercent} onChange={(e) => setHePercent(Number(e.target.value))} min={0} max={100} />
             </div>
           </div>
 
           {decompType !== DecompressionType.NoneDecomp && (
             <div>
-              <label className="block text-sm text-gray-400 mb-1">Total Deco Time (min)</label>
-              <input
-                type="number"
-                value={totalDecompTime}
-                onChange={(e) => setTotalDecompTime(Number(e.target.value))}
-                className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none"
-              />
+              <label className="block text-xs text-bismuth mb-1.5 font-medium uppercase tracking-wider">Total Deco Time (min)</label>
+              <input type="number" value={totalDecompTime} onChange={(e) => setTotalDecompTime(Number(e.target.value))} />
             </div>
           )}
         </div>
 
-        <div className="bg-card border border-card-border rounded-xl p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-surf">Remarks</h2>
+        <div className="glass-card p-6 space-y-4">
+          <div className="section-title">Remarks</div>
           <textarea
             value={remarks}
             onChange={(e) => setRemarks(e.target.value)}
-            className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white focus:border-teal focus:outline-none min-h-[80px]"
             placeholder="Any notes about the dive..."
+            rows={3}
           />
         </div>
 
         <button
           type="submit"
           disabled={isPending || isConfirming}
-          className="w-full py-3 rounded-xl bg-teal text-white font-semibold hover:bg-teal/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+          className="btn-primary w-full text-center"
         >
-          {isPending ? "Confirm in Wallet..." : isConfirming ? "Logging..." : "Log Dive"}
+          {isPending ? "Confirm in Wallet..." : isConfirming ? "Logging Dive..." : "🦾 Log Dive"}
         </button>
 
         {error && <p className="text-sm text-danger text-center">{error.message}</p>}
 
         {isSuccess && (
-          <div className="bg-kelp/10 border border-kelp/30 rounded-lg p-4 text-center">
-            <p className="text-kelp font-medium">Dive logged successfully!</p>
+          <div className="glass-card-inner p-4 text-center border-kelp/30">
+            <p className="text-kelp font-medium">\u2705 Dive logged successfully!</p>
             <button
               type="button"
               onClick={() => navigate("/logbook")}
               className="mt-2 text-sm text-surf underline"
             >
-              View Logbook
+              View in Logbook
             </button>
           </div>
         )}

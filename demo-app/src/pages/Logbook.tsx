@@ -1,72 +1,71 @@
-import { useAccount } from "wagmi";
-import { Link } from "react-router-dom";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useNavigate } from "react-router-dom";
+import { useDiveContract } from "../contexts/DiveContractContext";
 import { useDiveLog } from "../hooks/useDiveLog";
 import DiveCard from "../components/DiveCard";
 
 export default function Logbook() {
-  const { isConnected } = useAccount();
-  const [contractAddress] = useLocalStorage<string>("divechain_contract", "");
-  const { diveCount, allDiveIds, isOwner } = useDiveLog(
-    contractAddress as `0x${string}` | undefined,
-  );
+  const navigate = useNavigate();
+  const { hasContract, contractAddress } = useDiveContract();
+  const { diveCount, allDiveIds, isOwner, profile } = useDiveLog(contractAddress);
 
-  if (!isConnected) {
-    return (
-      <div className="text-center py-20">
-        <p className="text-gray-400">Connect your wallet to view your logbook.</p>
-      </div>
-    );
-  }
+  const diverName = Boolean(profile) ? String((profile as Record<string, unknown>)?.name ?? "Diver") : "Diver";
 
-  if (!contractAddress) {
+  if (!hasContract) {
     return (
-      <div className="text-center py-20">
-        <p className="text-gray-400 mb-4">No dive log contract configured.</p>
-        <Link
-          to="/deploy"
-          className="px-4 py-2 bg-teal rounded-lg text-white no-underline text-sm"
-        >
-          Deploy One Now
-        </Link>
+      <div className="max-w-md mx-auto text-center py-16">
+        <div className="glass-card p-8">
+          <div className="text-5xl mb-4">🌊</div>
+          <h2 className="text-lg font-bold text-white mb-2">No dive log found</h2>
+          <p className="text-sm text-gray-400 mb-6">Deploy your sovereign dive logbook to get started.</p>
+          <button onClick={() => navigate("/deploy")} className="btn-primary">
+            Create Dive Log
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-white">Logbook</h1>
+      <div className="flex items-center justify-between mb-2">
+        <div>
+          <h1 className="text-2xl font-bold text-white">
+            {diverName !== "Diver" ? diverName : "Diver"}'s Logbook
+          </h1>
+          <p className="text-xs text-gray-500 font-mono mt-1">{contractAddress}</p>
+        </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-gray-400">
-            {diveCount !== undefined ? `${diveCount.toString()} dives` : "Loading..."}
-          </span>
+          <div className="stat-box px-4 py-2">
+            <span className="text-lg font-bold text-surf">
+              {diveCount !== undefined ? diveCount.toString() : "--"}
+            </span>
+            <span className="text-[10px] text-gray-500 ml-1.5 uppercase">dives</span>
+          </div>
           {isOwner && (
-            <Link
-              to="/log-dive"
-              className="px-4 py-2 bg-teal rounded-lg text-white no-underline text-sm font-medium"
+            <button
+              onClick={() => navigate("/log-dive")}
+              className="btn-primary text-sm px-4 py-2"
             >
               + Log Dive
-            </Link>
+            </button>
           )}
         </div>
       </div>
 
-      <div className="text-xs text-gray-500 mb-4 break-all">
-        Contract: {contractAddress}
-      </div>
+      <div className="h-px bg-gradient-to-r from-transparent via-card-border-bright to-transparent my-6" />
 
       {!allDiveIds || allDiveIds.length === 0 ? (
-        <div className="text-center py-16">
-          <div className="text-4xl mb-4">&#127754;</div>
-          <p className="text-gray-400">No dives logged yet.</p>
+        <div className="text-center py-20">
+          <div className="text-5xl mb-4 animate-[sway_3s_ease-in-out_infinite]">🦾</div>
+          <h3 className="text-lg font-semibold text-white mb-2">No dives yet</h3>
+          <p className="text-sm text-gray-400 mb-6">Time to get wet. Log your first dive.</p>
           {isOwner && (
-            <Link
-              to="/log-dive"
-              className="inline-block mt-4 px-4 py-2 bg-teal rounded-lg text-white no-underline text-sm"
+            <button
+              onClick={() => navigate("/log-dive")}
+              className="btn-primary"
             >
               Log Your First Dive
-            </Link>
+            </button>
           )}
         </div>
       ) : (
@@ -74,7 +73,7 @@ export default function Logbook() {
           {allDiveIds.map((id) => (
             <DiveCardWrapper
               key={id.toString()}
-              contractAddress={contractAddress as `0x${string}`}
+              contractAddress={contractAddress!}
               diveId={id}
             />
           ))}
@@ -96,7 +95,18 @@ function DiveCardWrapper({
   const { data: voidInfo } = useVoidInfo(diveId);
   const { data: attestations } = useAttestations(diveId);
 
-  if (!dive) return null;
+  if (!dive) {
+    return (
+      <div className="glass-card p-4 animate-pulse">
+        <div className="h-4 bg-navy/50 rounded w-1/3 mb-3" />
+        <div className="grid grid-cols-3 gap-3">
+          <div className="h-10 bg-navy/50 rounded" />
+          <div className="h-10 bg-navy/50 rounded" />
+          <div className="h-10 bg-navy/50 rounded" />
+        </div>
+      </div>
+    );
+  }
 
   const d = dive as Record<string, unknown>;
   const data = d.data as Record<string, unknown>;
@@ -113,7 +123,7 @@ function DiveCardWrapper({
       units={Number(d.units ?? 0)}
       location={env?.location as string | undefined}
       isVoided={voidInfo ? (voidInfo as Record<string, unknown>).isVoided as boolean : false}
-      attestationCount={attestations ? (attestations as unknown[]).length : 0}
+      attestationCount={attestations && Array.isArray(attestations) ? (attestations as unknown[]).length : 0}
     />
   );
 }

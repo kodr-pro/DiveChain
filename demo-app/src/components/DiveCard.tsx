@@ -54,66 +54,62 @@ export default function DiveCard({
   attestationCount,
 }: DiveCardProps) {
   return (
-    <Link
-      to={`/logbook/${id.toString()}`}
-      className="block no-underline"
-    >
+    <Link to={`/logbook/${id.toString()}`} className="block no-underline group">
       <div
-        className={`rounded-xl border p-4 transition-all hover:border-teal/50 hover:shadow-lg hover:shadow-teal/5 ${
-          isVoided
-            ? "border-danger/30 bg-danger/5 opacity-60"
-            : "border-card-border bg-card"
+        className={`glass-card p-4 transition-all group-hover:border-bismuth/40 group-hover:shadow-lg group-hover:shadow-teal/5 ${
+          isVoided ? "border-danger/20 opacity-50" : ""
         }`}
       >
-        <div className="flex items-start justify-between mb-2">
+        <div className="flex items-start justify-between mb-3">
           <div>
             <h3 className="text-sm font-semibold text-white">
               Dive #{id.toString()}
             </h3>
-            <p className="text-xs text-gray-400">{formatDate(diveDate)}</p>
+            <p className="text-[11px] text-gray-500">{formatDate(diveDate)}</p>
           </div>
-          <span className="text-xs px-2 py-1 rounded-full bg-teal/10 text-teal font-medium">
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-teal/10 text-teal border border-teal/20 font-medium uppercase tracking-wider">
             {DIVE_MODE_LABELS[mode as DiveMode] ?? "Unknown"}
           </span>
         </div>
 
-        <div className="grid grid-cols-3 gap-3 mt-3 text-center">
-          <div>
-            <p className="text-lg font-bold text-surf">
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div className="stat-box py-2">
+            <p className="text-base font-bold text-surf">
               {formatDepth(maxDepth, units as UnitSystem)}
             </p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Depth</p>
+            <p className="text-[9px] text-gray-600 uppercase tracking-wider">depth</p>
           </div>
-          <div>
-            <p className="text-lg font-bold text-surf">
+          <div className="stat-box py-2">
+            <p className="text-base font-bold text-surf">
               {formatDuration(bottomTimeMinutes)}
             </p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Duration</p>
+            <p className="text-[9px] text-gray-600 uppercase tracking-wider">duration</p>
           </div>
-          <div>
-            <p className="text-lg font-bold text-surf">
+          <div className="stat-box py-2">
+            <p className="text-base font-bold text-surf">
               {attestationCount ?? 0}
             </p>
-            <p className="text-[10px] text-gray-500 uppercase tracking-wider">Attested</p>
+            <p className="text-[9px] text-gray-600 uppercase tracking-wider">attested</p>
           </div>
         </div>
 
         {location && (
-          <p className="text-xs text-gray-400 mt-2 truncate">&#128205; {location}</p>
+          <p className="text-[11px] text-gray-500 mt-2.5 truncate">📍 {location}</p>
         )}
 
-        <div className="flex items-center gap-2 mt-2">
-          <span className="text-[10px] px-2 py-0.5 rounded bg-navy/50 text-gray-300">
+        <div className="flex items-center gap-1.5 mt-2.5">
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-navy/40 text-gray-400 border border-card-border">
             {DIVE_PURPOSE_LABELS[purpose as DivePurpose] ?? "Unknown"}
           </span>
-          <span className="text-[10px] px-2 py-0.5 rounded bg-navy/50 text-gray-300">
+          <span className="text-[9px] px-1.5 py-0.5 rounded bg-navy/40 text-gray-400 border border-card-border">
             {UNIT_SYSTEM_LABELS[units as UnitSystem] ?? "Unknown"}
           </span>
+          {isVoided && (
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-danger/10 text-danger border border-danger/20 ml-auto">
+              VOIDED
+            </span>
+          )}
         </div>
-
-        {isVoided && (
-          <div className="mt-2 text-xs text-danger font-medium">VOIDED</div>
-        )}
       </div>
     </Link>
   );

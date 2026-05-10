@@ -32,65 +32,70 @@ contract SovereignDiveLogTest is Test {
     }
 
     function _makeDiveData() internal pure returns (DiveData memory) {
-        return DiveData({
-            leaveSurfaceTime: 1714521600,
-            leaveBottomTime: 1714522440,
-            reachSurfaceTime: 1714522700,
-            bottomTimeMinutes: 14,
-            maxDepth: 95,
-            averageDepth: 75,
-            mode: DiveMode.SSA,
-            purpose: DivePurpose.Inspection,
-            suit: SuitType.Dry
-        });
+        return
+            DiveData({
+                leaveSurfaceTime: 1714521600,
+                leaveBottomTime: 1714522440,
+                reachSurfaceTime: 1714522700,
+                bottomTimeMinutes: 14,
+                maxDepth: 95,
+                averageDepth: 75,
+                mode: DiveMode.SSA,
+                purpose: DivePurpose.Inspection,
+                suit: SuitType.Dry
+            });
     }
 
     function _makeEnvironment() internal pure returns (Environment memory) {
-        return Environment({
-            airTemp: 72,
-            waterTemp: 58,
-            currentKnots: 1,
-            location: "Naval Station Norfolk, Pier 3",
-            bottomType: "Mud/Silt",
-            weatherConditions: "Clear"
-        });
+        return
+            Environment({
+                airTemp: 72,
+                waterTemp: 58,
+                currentKnots: 1,
+                location: "Naval Station Norfolk, Pier 3",
+                bottomType: "Mud/Silt",
+                weatherConditions: "Clear"
+            });
     }
 
     function _makeDecompression() internal pure returns (Decompression memory) {
-        return Decompression({
-            decompType: DecompressionType.Standard,
-            totalDecompTimeMinutes: 6,
-            maxDepthAttained: 95,
-            tableSchedule: bytes32("USN 9-7"),
-            repetitiveGroup: bytes1("D"),
-            surfaceIntervalMinutes: 0,
-            newRepetitiveGroup: bytes1(0)
-        });
+        return
+            Decompression({
+                decompType: DecompressionType.Standard,
+                totalDecompTimeMinutes: 6,
+                maxDepthAttained: 95,
+                tableSchedule: bytes32("USN 9-7"),
+                repetitiveGroup: bytes1("D"),
+                surfaceIntervalMinutes: 0,
+                newRepetitiveGroup: bytes1(0)
+            });
     }
 
     function _makeGasData() internal pure returns (GasData memory) {
-        return GasData({
-            gasType: BreathingGas.Air,
-            o2Percent: 21,
-            hePercent: 0,
-            n2Percent: 79,
-            cylinderPressureIn: 3000,
-            cylinderPressureOut: 1200,
-            gasConsumed: 1800,
-            bailoutPressure: 2800
-        });
+        return
+            GasData({
+                gasType: BreathingGas.Air,
+                o2Percent: 21,
+                hePercent: 0,
+                n2Percent: 79,
+                cylinderPressureIn: 3000,
+                cylinderPressureOut: 1200,
+                gasConsumed: 1800,
+                bailoutPressure: 2800
+            });
     }
 
     function _makeDiveInput() internal pure returns (DiveInput memory) {
-        return DiveInput({
-            diveDate: DIVE_DATE,
-            units: UnitSystem.Imperial,
-            data: _makeDiveData(),
-            env: _makeEnvironment(),
-            decomp: _makeDecompression(),
-            gas: _makeGasData(),
-            remarks: "Hull inspection, starboard side."
-        });
+        return
+            DiveInput({
+                diveDate: DIVE_DATE,
+                units: UnitSystem.Imperial,
+                data: _makeDiveData(),
+                env: _makeEnvironment(),
+                decomp: _makeDecompression(),
+                gas: _makeGasData(),
+                remarks: "Hull inspection, starboard side."
+            });
     }
 
     function _logDive() internal returns (uint256) {
@@ -181,12 +186,16 @@ contract SovereignDiveLogTest is Test {
     }
 
     function test_revert_getDive_notFound() public {
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(1)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(1))
+        );
         diveLog.getDive(1);
     }
 
     function test_revert_getDive_zeroId() public {
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(0)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(0))
+        );
         diveLog.getDive(0);
     }
 
@@ -248,7 +257,9 @@ contract SovereignDiveLogTest is Test {
         ids[0] = 1;
         ids[1] = 99;
 
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99))
+        );
         diveLog.getMultipleDives(ids);
     }
 
@@ -341,7 +352,12 @@ contract SovereignDiveLogTest is Test {
 
         vm.startPrank(owner);
         diveLog.voidDive(1, 0, "First void");
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveAlreadyVoided.selector, uint256(1)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.DiveAlreadyVoided.selector,
+                uint256(1)
+            )
+        );
         diveLog.voidDive(1, 0, "Second void attempt");
         vm.stopPrank();
     }
@@ -356,7 +372,9 @@ contract SovereignDiveLogTest is Test {
 
     function test_revert_voidDive_notFound() public {
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99))
+        );
         diveLog.voidDive(99, 0, "No dive");
     }
 
@@ -364,7 +382,13 @@ contract SovereignDiveLogTest is Test {
         _logDive();
 
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.InvalidSupersede.selector, uint256(1), uint256(1)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.InvalidSupersede.selector,
+                uint256(1),
+                uint256(1)
+            )
+        );
         diveLog.voidDive(1, 1, "Cannot supersede self");
     }
 
@@ -372,7 +396,13 @@ contract SovereignDiveLogTest is Test {
         _logDive();
 
         vm.prank(owner);
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.InvalidSupersede.selector, uint256(1), uint256(99)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.InvalidSupersede.selector,
+                uint256(1),
+                uint256(99)
+            )
+        );
         diveLog.voidDive(1, 99, "Nonexistent supersede");
     }
 
@@ -382,7 +412,12 @@ contract SovereignDiveLogTest is Test {
         _logDive();
 
         uint256 nonce = diveLog.attesterNonce(buddy);
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
+        bytes32 digest = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
@@ -402,7 +437,12 @@ contract SovereignDiveLogTest is Test {
         uint256 nonce0 = diveLog.attesterNonce(buddy);
         assertEq(nonce0, 0);
 
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce0);
+        bytes32 digest = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce0
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
         diveLog.attestDive(1, nonce0, signature);
@@ -417,12 +457,22 @@ contract SovereignDiveLogTest is Test {
         (address buddy2, uint256 buddy2Pk) = makeAddrAndKey("buddy2");
 
         uint256 nonce1 = diveLog.attesterNonce(buddy);
-        bytes32 digest1 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce1);
+        bytes32 digest1 = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce1
+        );
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(buddyPk, digest1);
         bytes memory sig1 = abi.encodePacked(r1, s1, v1);
 
         uint256 nonce2 = diveLog.attesterNonce(buddy2);
-        bytes32 digest2 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce2);
+        bytes32 digest2 = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce2
+        );
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(buddy2Pk, digest2);
         bytes memory sig2 = abi.encodePacked(r2, s2, v2);
 
@@ -438,11 +488,22 @@ contract SovereignDiveLogTest is Test {
     function test_revert_attestDive_nonceMismatch() public {
         _logDive();
 
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, 5);
+        bytes32 digest = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            5
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.NonceMismatch.selector, uint256(0), uint256(5)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.NonceMismatch.selector,
+                uint256(0),
+                uint256(5)
+            )
+        );
         diveLog.attestDive(1, 5, signature);
     }
 
@@ -450,18 +511,34 @@ contract SovereignDiveLogTest is Test {
         _logDive();
 
         uint256 nonce = diveLog.attesterNonce(buddy);
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
+        bytes32 digest = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         diveLog.attestDive(1, nonce, signature);
 
         uint256 nextNonce = nonce + 1;
-        bytes32 digest2 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nextNonce);
+        bytes32 digest2 = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nextNonce
+        );
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(buddyPk, digest2);
         bytes memory signature2 = abi.encodePacked(r2, s2, v2);
 
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.AlreadyAttested.selector, uint256(1), buddy));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.AlreadyAttested.selector,
+                uint256(1),
+                buddy
+            )
+        );
         diveLog.attestDive(1, nextNonce, signature2);
     }
 
@@ -475,7 +552,9 @@ contract SovereignDiveLogTest is Test {
 
     function test_revert_attestDive_notFound() public {
         bytes memory signature = new bytes(65);
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99)));
+        vm.expectRevert(
+            abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99))
+        );
         diveLog.attestDive(99, 0, signature);
     }
 
@@ -486,11 +565,21 @@ contract SovereignDiveLogTest is Test {
         diveLog.voidDive(1, 0, "Voided");
 
         uint256 nonce = diveLog.attesterNonce(buddy);
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
+        bytes32 digest = DiveLogTypedData.attestationDigest(
+            1,
+            address(diveLog),
+            block.chainid,
+            nonce
+        );
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveAlreadyVoided.selector, uint256(1)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IDiveLog.DiveAlreadyVoided.selector,
+                uint256(1)
+            )
+        );
         diveLog.attestDive(1, nonce, signature);
     }
 
@@ -498,7 +587,14 @@ contract SovereignDiveLogTest is Test {
 
     function test_updateProfile() public {
         vm.prank(owner);
-        diveLog.updateProfile("Updated Name", 31, 73, 190, BiologicalSex.Male, UnitSystem.Metric);
+        diveLog.updateProfile(
+            "Updated Name",
+            31,
+            73,
+            190,
+            BiologicalSex.Male,
+            UnitSystem.Metric
+        );
 
         DiverProfile memory p = diveLog.profile();
         assertEq(p.name, "Updated Name");
@@ -512,14 +608,28 @@ contract SovereignDiveLogTest is Test {
     function test_revert_updateProfile_notOwner() public {
         vm.prank(stranger);
         vm.expectRevert(IDiveLog.NotOwner.selector);
-        diveLog.updateProfile("Hacker", 99, 99, 99, BiologicalSex.Unspecified, UnitSystem.Imperial);
+        diveLog.updateProfile(
+            "Hacker",
+            99,
+            99,
+            99,
+            BiologicalSex.Unspecified,
+            UnitSystem.Imperial
+        );
     }
 
     function test_profile_emitsEvent() public {
         vm.prank(owner);
         vm.expectEmit(false, false, false, true);
         emit IDiveLog.ProfileUpdated();
-        diveLog.updateProfile("Updated", 31, 73, 190, BiologicalSex.Male, UnitSystem.Metric);
+        diveLog.updateProfile(
+            "Updated",
+            31,
+            73,
+            190,
+            BiologicalSex.Male,
+            UnitSystem.Metric
+        );
     }
 
     // ===== supportsInterface =====

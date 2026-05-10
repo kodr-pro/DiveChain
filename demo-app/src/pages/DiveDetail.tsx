@@ -1,6 +1,6 @@
 import { useParams, Link, useNavigate } from "react-router-dom";
 import { useState } from "react";
-import { useLocalStorage } from "../hooks/useLocalStorage";
+import { useDiveContract } from "../contexts/DiveContractContext";
 import { useDiveLog } from "../hooks/useDiveLog";
 import {
   DIVE_MODE_LABELS,
@@ -20,10 +20,8 @@ import {
 export default function DiveDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const [contractAddress] = useLocalStorage<string>("divechain_contract", "");
-  const { useDive, useVoidInfo, useAttestations, voidDive, isOwner, isPending, isConfirming, isSuccess } = useDiveLog(
-    contractAddress as `0x${string}` | undefined,
-  );
+  const { contractAddress } = useDiveContract();
+  const { useDive, useVoidInfo, useAttestations, voidDive, isOwner, isPending, isConfirming, isSuccess } = useDiveLog(contractAddress);
 
   const diveId = id ? BigInt(id) : 0n;
   const { data: dive } = useDive(diveId);
@@ -45,6 +43,7 @@ export default function DiveDetail() {
   if (!dive) {
     return (
       <div className="text-center py-20">
+        <div className="text-4xl mb-3 animate-pulse">🌊</div>
         <p className="text-gray-400">Loading dive...</p>
       </div>
     );
@@ -69,46 +68,47 @@ export default function DiveDetail() {
     setShowVoidForm(false);
   };
 
+  const depthUnit = UNIT_SYSTEM_LABELS[Number(d.units) as UnitSystem] === "Metric" ? "meters" : "feet";
+  const tempUnit = UNIT_SYSTEM_LABELS[Number(d.units) as UnitSystem] === "Metric" ? "\u00B0C" : "\u00B0F";
+
   return (
     <div className="max-w-2xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <button
           onClick={() => navigate(-1)}
-          className="text-gray-400 hover:text-white transition-colors"
+          className="text-gray-400 hover:text-white transition-colors text-sm"
         >
-          &larr; Back
+          \u2190 Back
         </button>
         <h1 className="text-2xl font-bold text-white">Dive #{id}</h1>
         {isVoided && (
-          <span className="px-2 py-1 rounded text-xs font-bold bg-danger/20 text-danger">
+          <span className="px-2 py-0.5 rounded text-xs font-bold bg-danger/20 text-danger border border-danger/30">
             VOIDED
           </span>
         )}
       </div>
 
-      <div className="bg-card border border-card-border rounded-xl p-6 space-y-6">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-          <div>
+      <div className="glass-card p-6 space-y-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="stat-box">
             <p className="text-2xl font-bold text-surf">{String(data?.maxDepth ?? 0)}</p>
-            <p className="text-xs text-gray-500">
-              {UNIT_SYSTEM_LABELS[Number(d.units) as UnitSystem] === "Metric" ? "meters" : "feet"} max depth
-            </p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">{depthUnit} depth</p>
           </div>
-          <div>
+          <div className="stat-box">
             <p className="text-2xl font-bold text-surf">{String(data?.bottomTimeMinutes ?? 0)}</p>
-            <p className="text-xs text-gray-500">bottom time (min)</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">bottom min</p>
           </div>
-          <div>
+          <div className="stat-box">
             <p className="text-2xl font-bold text-surf">{String(data?.averageDepth ?? 0)}</p>
-            <p className="text-xs text-gray-500">avg depth</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">avg depth</p>
           </div>
-          <div>
-            <p className="text-2xl font-bold text-surf">{attestations ? (attestations as unknown[]).length : 0}</p>
-            <p className="text-xs text-gray-500">attestations</p>
+          <div className="stat-box">
+            <p className="text-2xl font-bold text-surf">{attestations && Array.isArray(attestations) ? (attestations as unknown[]).length : 0}</p>
+            <p className="text-[10px] text-gray-500 uppercase tracking-wider">attested</p>
           </div>
         </div>
 
-        <div className="border-t border-card-border pt-4 space-y-3">
+        <div className="depth-line pl-4 space-y-3">
           <DetailRow label="Date" value={formatDate(d.diveDate as bigint)} />
           <DetailRow label="Mode" value={DIVE_MODE_LABELS[Number(data?.mode) as DiveMode] ?? "-"} />
           <DetailRow label="Purpose" value={DIVE_PURPOSE_LABELS[Number(data?.purpose) as DivePurpose] ?? "-"} />
@@ -117,51 +117,57 @@ export default function DiveDetail() {
         </div>
 
         {env && (String(env.location ?? "") || String(env.waterTemp ?? "") || String(env.airTemp ?? "")) && (
-          <div className="border-t border-card-border pt-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Environment</h3>
-            {String(env.location ?? "") && <DetailRow label="Location" value={String(env.location)} />}
-            {String(env.bottomType ?? "") && <DetailRow label="Bottom" value={String(env.bottomType)} />}
-            <DetailRow label="Water Temp" value={`${String(env.waterTemp)}°`} />
-            <DetailRow label="Air Temp" value={`${String(env.airTemp)}°`} />
-            {String(env.weatherConditions ?? "") && <DetailRow label="Weather" value={String(env.weatherConditions)} />}
+          <div>
+            <div className="section-title">Environment</div>
+            <div className="space-y-3 pl-2">
+              {String(env.location ?? "") && <DetailRow label="Location" value={String(env.location)} />}
+              {String(env.bottomType ?? "") && <DetailRow label="Bottom" value={String(env.bottomType)} />}
+              <DetailRow label="Water Temp" value={`${String(env.waterTemp)}${tempUnit}`} />
+              <DetailRow label="Air Temp" value={`${String(env.airTemp)}${tempUnit}`} />
+              {String(env.weatherConditions ?? "") && <DetailRow label="Weather" value={String(env.weatherConditions)} />}
+            </div>
           </div>
         )}
 
         {gas && (
-          <div className="border-t border-card-border pt-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Gas</h3>
-            <DetailRow label="Type" value={BREATHING_GAS_LABELS[Number(gas.gasType) as BreathingGas] ?? "-"} />
-            <DetailRow label="O2" value={`${gas.o2Percent}%`} />
-            <DetailRow label="He" value={`${gas.hePercent}%`} />
+          <div>
+            <div className="section-title">Gas</div>
+            <div className="space-y-3 pl-2">
+              <DetailRow label="Type" value={BREATHING_GAS_LABELS[Number(gas.gasType) as BreathingGas] ?? "-"} />
+              <DetailRow label="O2" value={`${gas.o2Percent}%`} />
+              <DetailRow label="He" value={`${gas.hePercent}%`} />
+            </div>
           </div>
         )}
 
         {decomp && Number(decomp.decompType) !== 0 && (
-          <div className="border-t border-card-border pt-4 space-y-3">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider">Decompression</h3>
-            <DetailRow label="Type" value={DECOMP_TYPE_LABELS[Number(decomp.decompType) as DecompressionType] ?? "-"} />
-            <DetailRow label="Total Deco Time" value={`${decomp.totalDecompTimeMinutes} min`} />
+          <div>
+            <div className="section-title">Decompression</div>
+            <div className="space-y-3 pl-2">
+              <DetailRow label="Type" value={DECOMP_TYPE_LABELS[Number(decomp.decompType) as DecompressionType] ?? "-"} />
+              <DetailRow label="Total Deco Time" value={`${decomp.totalDecompTimeMinutes} min`} />
+            </div>
           </div>
         )}
 
         {String(d.remarks ?? "") && (
-          <div className="border-t border-card-border pt-4">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">Remarks</h3>
-            <p className="text-sm text-gray-400">{String(d.remarks)}</p>
+          <div>
+            <div className="section-title">Remarks</div>
+            <p className="text-sm text-gray-400 pl-2">{String(d.remarks)}</p>
           </div>
         )}
 
         {attestations && Array.isArray(attestations) && (attestations as unknown[]).length > 0 ? (
-          <div className="border-t border-card-border pt-4">
-            <h3 className="text-sm font-semibold text-gray-300 uppercase tracking-wider mb-2">Attestations</h3>
-            <div className="space-y-2">
+          <div>
+            <div className="section-title">Buddy Attestations</div>
+            <div className="space-y-2 pl-2">
               {(attestations as Record<string, unknown>[]).map((a, i) => (
-                <div key={i} className="flex items-center gap-2 text-sm">
-                  <span className="text-kelp">&#9989;</span>
+                <div key={i} className="flex items-center gap-2 text-sm glass-card-inner px-3 py-2">
+                  <span className="text-kelp">\u2705</span>
                   <span className="text-gray-300 font-mono text-xs">
                     {String(a.attester).slice(0, 6)}...{String(a.attester).slice(-4)}
                   </span>
-                  <span className="text-gray-500 text-xs">
+                  <span className="text-gray-500 text-xs ml-auto">
                     {new Date(Number(a.attestedAt) * 1000).toLocaleDateString()}
                   </span>
                 </div>
@@ -171,42 +177,37 @@ export default function DiveDetail() {
         ) : null}
 
         {isOwner && !isVoided && (
-          <div className="border-t border-card-border pt-4">
+          <div className="pt-2">
             {!showVoidForm ? (
               <button
                 onClick={() => setShowVoidForm(true)}
-                className="text-sm text-danger hover:underline"
+                className="text-xs text-danger/60 hover:text-danger transition-colors"
               >
                 Void this dive
               </button>
             ) : (
-              <div className="space-y-3 bg-danger/5 rounded-lg p-4">
+              <div className="glass-card-inner p-4 space-y-3 border-danger/20">
                 <input
                   type="text"
                   value={voidReason}
                   onChange={(e) => setVoidReason(e.target.value)}
                   placeholder="Reason for voiding"
-                  className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white text-sm focus:border-danger focus:outline-none"
                 />
                 <input
                   type="number"
                   value={supersededBy}
                   onChange={(e) => setSupersededBy(e.target.value)}
                   placeholder="Superseded by dive ID (0 = none)"
-                  className="w-full bg-deep border border-card-border rounded-lg px-3 py-2 text-white text-sm focus:border-danger focus:outline-none"
                 />
                 <div className="flex gap-2">
                   <button
                     onClick={handleVoid}
                     disabled={isPending || isConfirming || !voidReason}
-                    className="px-4 py-2 bg-danger text-white text-sm rounded-lg disabled:opacity-50"
+                    className="px-4 py-2 bg-danger/80 text-white text-sm rounded-lg disabled:opacity-50"
                   >
                     {isPending ? "Confirm..." : isConfirming ? "Voiding..." : "Confirm Void"}
                   </button>
-                  <button
-                    onClick={() => setShowVoidForm(false)}
-                    className="px-4 py-2 text-gray-400 text-sm"
-                  >
+                  <button onClick={() => setShowVoidForm(false)} className="px-4 py-2 text-gray-400 text-sm">
                     Cancel
                   </button>
                 </div>
@@ -217,22 +218,20 @@ export default function DiveDetail() {
         )}
 
         {isVoided && Boolean(voidInfo) && (
-          <div className="border-t border-card-border pt-4">
-            <div className="bg-danger/5 rounded-lg p-4 text-sm space-y-1">
-              <p className="text-danger font-medium">This dive has been voided</p>
-              <p className="text-gray-400">Reason: {String((voidInfo as Record<string, unknown>).reason)}</p>
-              {Boolean((voidInfo as Record<string, unknown>).supersededById) && (
-                <p className="text-gray-400">
-                  Superseded by:{" "}
-                  <Link
-                    to={`/logbook/${((voidInfo as Record<string, unknown>).supersededById as bigint).toString()}`}
-                    className="text-surf underline"
-                  >
-                    Dive #{((voidInfo as Record<string, unknown>).supersededById as bigint).toString()}
-                  </Link>
-                </p>
-              )}
-            </div>
+          <div className="glass-card-inner p-4 space-y-1 border-danger/20">
+            <p className="text-danger font-medium text-sm">This dive has been voided</p>
+            <p className="text-xs text-gray-400">Reason: {String((voidInfo as Record<string, unknown>).reason)}</p>
+            {Boolean((voidInfo as Record<string, unknown>).supersededById) && (
+              <p className="text-xs text-gray-400">
+                Superseded by:{" "}
+                <Link
+                  to={`/logbook/${((voidInfo as Record<string, unknown>).supersededById as bigint).toString()}`}
+                  className="text-surf underline"
+                >
+                  Dive #{((voidInfo as Record<string, unknown>).supersededById as bigint).toString()}
+                </Link>
+              </p>
+            )}
           </div>
         )}
       </div>
@@ -242,9 +241,9 @@ export default function DiveDetail() {
 
 function DetailRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex justify-between">
-      <span className="text-sm text-gray-400">{label}</span>
-      <span className="text-sm text-white">{value}</span>
+    <div className="flex justify-between items-center">
+      <span className="text-xs text-gray-500 uppercase tracking-wider">{label}</span>
+      <span className="text-sm text-white font-medium">{value}</span>
     </div>
   );
 }
