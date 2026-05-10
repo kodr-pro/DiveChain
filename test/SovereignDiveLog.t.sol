@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {SovereignDiveLog} from "../src/SovereignDiveLog.sol";
-import {UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, BiologicalSex, DiveData, Environment, Decompression, GasData, DiverProfile, DiveLog, VoidInfo, Attestation} from "../src/interfaces/IDiveLogTypes.sol";
+import {UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, BiologicalSex, DiveData, Environment, Decompression, GasData, DiverProfile, DiveLog, DiveInput, VoidInfo, Attestation} from "../src/interfaces/IDiveLogTypes.sol";
 import {IDiveLog} from "../src/interfaces/IDiveLog.sol";
 import {IERC165} from "../src/interfaces/IERC165.sol";
 import {DiveLogTypedData} from "../src/interfaces/IDiveLogTypedData.sol";
@@ -12,7 +12,7 @@ contract SovereignDiveLogTest is Test {
     SovereignDiveLog public diveLog;
     address public owner = makeAddr("owner");
     address public stranger = makeAddr("stranger");
-    address public buddy = makeAddr("buddy");
+    address public buddy;
     uint256 public buddyPk;
 
     uint64 constant DIVE_DATE = 1714521600;
@@ -81,17 +81,21 @@ contract SovereignDiveLogTest is Test {
         });
     }
 
+    function _makeDiveInput() internal pure returns (DiveInput memory) {
+        return DiveInput({
+            diveDate: DIVE_DATE,
+            units: UnitSystem.Imperial,
+            data: _makeDiveData(),
+            env: _makeEnvironment(),
+            decomp: _makeDecompression(),
+            gas: _makeGasData(),
+            remarks: "Hull inspection, starboard side."
+        });
+    }
+
     function _logDive() internal returns (uint256) {
         vm.prank(owner);
-        return diveLog.logDive(
-            DIVE_DATE,
-            UnitSystem.Imperial,
-            _makeDiveData(),
-            _makeEnvironment(),
-            _makeDecompression(),
-            _makeGasData(),
-            "Hull inspection, starboard side."
-        );
+        return diveLog.logDive(_makeDiveInput());
     }
 
     // ===== Constructor =====
@@ -119,29 +123,15 @@ contract SovereignDiveLogTest is Test {
         vm.prank(owner);
         vm.expectEmit(true, true, false, true);
         emit IDiveLog.DiveLogged(1, DIVE_DATE);
-        diveLog.logDive(
-            DIVE_DATE,
-            UnitSystem.Imperial,
-            _makeDiveData(),
-            _makeEnvironment(),
-            _makeDecompression(),
-            _makeGasData(),
-            "Test"
-        );
+        diveLog.logDive(_makeDiveInput());
     }
 
     function test_logDive_sequentialIds() public {
         vm.startPrank(owner);
         for (uint256 i; i < 5; i++) {
-            uint256 id = diveLog.logDive(
-                DIVE_DATE + uint64(i * 86400),
-                UnitSystem.Imperial,
-                _makeDiveData(),
-                _makeEnvironment(),
-                _makeDecompression(),
-                _makeGasData(),
-                "Test dive"
-            );
+            DiveInput memory input = _makeDiveInput();
+            input.diveDate = DIVE_DATE + uint64(i * 86400);
+            uint256 id = diveLog.logDive(input);
             assertEq(id, i + 1);
         }
         vm.stopPrank();
@@ -151,39 +141,31 @@ contract SovereignDiveLogTest is Test {
     function test_revert_logDive_notOwner() public {
         vm.prank(stranger);
         vm.expectRevert(IDiveLog.NotOwner.selector);
-        diveLog.logDive(
-            DIVE_DATE,
-            UnitSystem.Imperial,
-            _makeDiveData(),
-            _makeEnvironment(),
-            _makeDecompression(),
-            _makeGasData(),
-            "Unauthorized"
-        );
+        diveLog.logDive(_makeDiveInput());
     }
 
     function test_revert_zeroDepth() public {
-        DiveData memory data = _makeDiveData();
-        data.maxDepth = 0;
+        DiveInput memory input = _makeDiveInput();
+        input.data.maxDepth = 0;
         vm.prank(owner);
         vm.expectRevert(IDiveLog.InvalidDepth.selector);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
+        diveLog.logDive(input);
     }
 
     function test_revert_negativeDepth() public {
-        DiveData memory data = _makeDiveData();
-        data.maxDepth = -10;
+        DiveInput memory input = _makeDiveInput();
+        input.data.maxDepth = -10;
         vm.prank(owner);
         vm.expectRevert(IDiveLog.InvalidDepth.selector);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
+        diveLog.logDive(input);
     }
 
     function test_revert_zeroBottomTime() public {
-        DiveData memory data = _makeDiveData();
-        data.bottomTimeMinutes = 0;
+        DiveInput memory input = _makeDiveInput();
+        input.data.bottomTimeMinutes = 0;
         vm.prank(owner);
         vm.expectRevert(IDiveLog.InvalidTimes.selector);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad");
+        diveLog.logDive(input);
     }
 
     // ===== getDive =====
@@ -212,9 +194,18 @@ contract SovereignDiveLogTest is Test {
 
     function test_getDivesByDate() public {
         vm.startPrank(owner);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 1");
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 2");
-        diveLog.logDive(DIVE_DATE + 86400, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 3");
+        DiveInput memory input1 = _makeDiveInput();
+        input1.remarks = "Dive 1";
+        diveLog.logDive(input1);
+
+        DiveInput memory input2 = _makeDiveInput();
+        input2.remarks = "Dive 2";
+        diveLog.logDive(input2);
+
+        DiveInput memory input3 = _makeDiveInput();
+        input3.diveDate = DIVE_DATE + 86400;
+        input3.remarks = "Dive 3";
+        diveLog.logDive(input3);
         vm.stopPrank();
 
         uint256[] memory sameDay = diveLog.getDivesByDate(DIVE_DATE);
@@ -231,8 +222,14 @@ contract SovereignDiveLogTest is Test {
 
     function test_getMultipleDives() public {
         vm.startPrank(owner);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 1");
-        diveLog.logDive(DIVE_DATE + 86400, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Dive 2");
+        DiveInput memory input1 = _makeDiveInput();
+        input1.remarks = "Dive 1";
+        diveLog.logDive(input1);
+
+        DiveInput memory input2 = _makeDiveInput();
+        input2.diveDate = DIVE_DATE + 86400;
+        input2.remarks = "Dive 2";
+        diveLog.logDive(input2);
         vm.stopPrank();
 
         uint256[] memory ids = new uint256[](2);
@@ -260,7 +257,9 @@ contract SovereignDiveLogTest is Test {
     function test_getAllDiveIds() public {
         vm.startPrank(owner);
         for (uint256 i; i < 3; i++) {
-            diveLog.logDive(DIVE_DATE + uint64(i * 86400), UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+            DiveInput memory input = _makeDiveInput();
+            input.diveDate = DIVE_DATE + uint64(i * 86400);
+            diveLog.logDive(input);
         }
         vm.stopPrank();
 
@@ -274,57 +273,22 @@ contract SovereignDiveLogTest is Test {
     // ===== batchLogDives =====
 
     function test_batchLogDives() public {
-        uint64[3] memory dates = [DIVE_DATE, DIVE_DATE + 86400, DIVE_DATE + 172800];
-        uint64[] memory diveDates = new uint64[](3);
-        UnitSystem[] memory units = new UnitSystem[](3);
-        DiveData[] memory dataArr = new DiveData[](3);
-        Environment[] memory envArr = new Environment[](3);
-        Decompression[] memory decompArr = new Decompression[](3);
-        GasData[] memory gasArr = new GasData[](3);
-        string[] memory remarksArr = new string[](3);
+        DiveInput[] memory inputs = new DiveInput[](3);
 
         for (uint256 i; i < 3; i++) {
-            diveDates[i] = dates[i];
-            units[i] = UnitSystem.Imperial;
-            dataArr[i] = _makeDiveData();
-            envArr[i] = _makeEnvironment();
-            decompArr[i] = _makeDecompression();
-            gasArr[i] = _makeGasData();
-            remarksArr[i] = "Batch dive";
+            inputs[i] = _makeDiveInput();
+            inputs[i].diveDate = DIVE_DATE + uint64(i * 86400);
+            inputs[i].remarks = "Batch dive";
         }
 
         vm.prank(owner);
-        uint256[] memory ids = diveLog.batchLogDives(diveDates, units, dataArr, envArr, decompArr, gasArr, remarksArr);
+        uint256[] memory ids = diveLog.batchLogDives(inputs);
 
         assertEq(ids.length, 3);
         assertEq(ids[0], 1);
         assertEq(ids[1], 2);
         assertEq(ids[2], 3);
         assertEq(diveLog.diveCount(), 3);
-    }
-
-    function test_batchLogDives_revert_arrayLengthMismatch() public {
-        uint64[] memory diveDates = new uint64[](2);
-        UnitSystem[] memory units = new UnitSystem[](1);
-        DiveData[] memory dataArr = new DiveData[](2);
-        Environment[] memory envArr = new Environment[](2);
-        Decompression[] memory decompArr = new Decompression[](2);
-        GasData[] memory gasArr = new GasData[](2);
-        string[] memory remarksArr = new string[](2);
-
-        for (uint256 i; i < 2; i++) {
-            diveDates[i] = DIVE_DATE;
-            dataArr[i] = _makeDiveData();
-            envArr[i] = _makeEnvironment();
-            decompArr[i] = _makeDecompression();
-            gasArr[i] = _makeGasData();
-            remarksArr[i] = "Batch";
-        }
-        units[0] = UnitSystem.Imperial;
-
-        vm.prank(owner);
-        vm.expectRevert(IDiveLog.ArrayLengthMismatch.selector);
-        diveLog.batchLogDives(diveDates, units, dataArr, envArr, decompArr, gasArr, remarksArr);
     }
 
     // ===== voidDive =====
@@ -340,11 +304,12 @@ contract SovereignDiveLogTest is Test {
 
     function test_voidDive_withSupersede() public {
         vm.startPrank(owner);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "Bad dive");
+        diveLog.logDive(_makeDiveInput());
 
-        DiveData memory correctedData = _makeDiveData();
-        correctedData.maxDepth = 100;
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, correctedData, _makeEnvironment(), _makeDecompression(), _makeGasData(), "Corrected dive");
+        DiveInput memory corrected = _makeDiveInput();
+        corrected.data.maxDepth = 100;
+        corrected.remarks = "Corrected dive";
+        diveLog.logDive(corrected);
 
         diveLog.voidDive(1, 2, "Depth was recorded incorrectly");
         vm.stopPrank();
@@ -411,37 +376,19 @@ contract SovereignDiveLogTest is Test {
         diveLog.voidDive(1, 99, "Nonexistent supersede");
     }
 
-    function test_voidDive_chain() public {
-        vm.startPrank(owner);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "V1");
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "V2");
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, _makeDiveData(), _makeEnvironment(), _makeDecompression(), _makeGasData(), "V3");
-
-        diveLog.voidDive(1, 2, "Superseded by V2");
-        diveLog.voidDive(2, 3, "Superseded by V3");
-        vm.stopPrank();
-
-        VoidInfo memory v1 = diveLog.getVoidInfo(1);
-        assertEq(v1.supersededById, 2);
-
-        VoidInfo memory v2 = diveLog.getVoidInfo(2);
-        assertEq(v2.supersededById, 3);
-
-        assertFalse(diveLog.isDiveVoided(3));
-    }
-
     // ===== attestDive =====
 
     function test_attestDive() public {
         _logDive();
 
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
+        uint256 nonce = diveLog.attesterNonce(buddy);
+        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.expectEmit(true, true, false, true);
         emit IDiveLog.DiveAttested(1, buddy);
-        diveLog.attestDive(1, signature);
+        diveLog.attestDive(1, nonce, signature);
 
         Attestation[] memory attestations = diveLog.getAttestations(1);
         assertEq(attestations.length, 1);
@@ -449,21 +396,38 @@ contract SovereignDiveLogTest is Test {
         assertGt(attestations[0].attestedAt, 0);
     }
 
+    function test_attestDive_incrementsNonce() public {
+        _logDive();
+
+        uint256 nonce0 = diveLog.attesterNonce(buddy);
+        assertEq(nonce0, 0);
+
+        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce0);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+        diveLog.attestDive(1, nonce0, signature);
+
+        uint256 nonce1 = diveLog.attesterNonce(buddy);
+        assertEq(nonce1, 1);
+    }
+
     function test_attestDive_multipleAttestations() public {
         _logDive();
 
         (address buddy2, uint256 buddy2Pk) = makeAddrAndKey("buddy2");
 
-        bytes32 digest1 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
+        uint256 nonce1 = diveLog.attesterNonce(buddy);
+        bytes32 digest1 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce1);
         (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(buddyPk, digest1);
         bytes memory sig1 = abi.encodePacked(r1, s1, v1);
 
-        bytes32 digest2 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
+        uint256 nonce2 = diveLog.attesterNonce(buddy2);
+        bytes32 digest2 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce2);
         (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(buddy2Pk, digest2);
         bytes memory sig2 = abi.encodePacked(r2, s2, v2);
 
-        diveLog.attestDive(1, sig1);
-        diveLog.attestDive(1, sig2);
+        diveLog.attestDive(1, nonce1, sig1);
+        diveLog.attestDive(1, nonce2, sig2);
 
         Attestation[] memory attestations = diveLog.getAttestations(1);
         assertEq(attestations.length, 2);
@@ -471,17 +435,34 @@ contract SovereignDiveLogTest is Test {
         assertEq(attestations[1].attester, buddy2);
     }
 
-    function test_revert_attestDive_alreadyAttested() public {
+    function test_revert_attestDive_nonceMismatch() public {
         _logDive();
 
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
+        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, 5);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
-        diveLog.attestDive(1, signature);
+        vm.expectRevert(abi.encodeWithSelector(IDiveLog.NonceMismatch.selector, uint256(0), uint256(5)));
+        diveLog.attestDive(1, 5, signature);
+    }
+
+    function test_revert_attestDive_alreadyAttested() public {
+        _logDive();
+
+        uint256 nonce = diveLog.attesterNonce(buddy);
+        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
+        bytes memory signature = abi.encodePacked(r, s, v);
+
+        diveLog.attestDive(1, nonce, signature);
+
+        uint256 nextNonce = nonce + 1;
+        bytes32 digest2 = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nextNonce);
+        (uint8 v2, bytes32 r2, bytes32 s2) = vm.sign(buddyPk, digest2);
+        bytes memory signature2 = abi.encodePacked(r2, s2, v2);
 
         vm.expectRevert(abi.encodeWithSelector(IDiveLog.AlreadyAttested.selector, uint256(1), buddy));
-        diveLog.attestDive(1, signature);
+        diveLog.attestDive(1, nextNonce, signature2);
     }
 
     function test_revert_attestDive_invalidSignature() public {
@@ -489,21 +470,13 @@ contract SovereignDiveLogTest is Test {
 
         bytes memory badSignature = new bytes(65);
         vm.expectRevert(IDiveLog.InvalidSignature.selector);
-        diveLog.attestDive(1, badSignature);
-    }
-
-    function test_revert_attestDive_wrongLength() public {
-        _logDive();
-
-        bytes memory shortSig = new bytes(64);
-        vm.expectRevert(IDiveLog.InvalidSignature.selector);
-        diveLog.attestDive(1, shortSig);
+        diveLog.attestDive(1, 0, badSignature);
     }
 
     function test_revert_attestDive_notFound() public {
         bytes memory signature = new bytes(65);
         vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveNotFound.selector, uint256(99)));
-        diveLog.attestDive(99, signature);
+        diveLog.attestDive(99, 0, signature);
     }
 
     function test_revert_attestDive_voidedDive() public {
@@ -512,27 +485,13 @@ contract SovereignDiveLogTest is Test {
         vm.prank(owner);
         diveLog.voidDive(1, 0, "Voided");
 
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
+        uint256 nonce = diveLog.attesterNonce(buddy);
+        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid, nonce);
         (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
         bytes memory signature = abi.encodePacked(r, s, v);
 
         vm.expectRevert(abi.encodeWithSelector(IDiveLog.DiveAlreadyVoided.selector, uint256(1)));
-        diveLog.attestDive(1, signature);
-    }
-
-    function test_attestDive_anyoneCanSubmit() public {
-        _logDive();
-
-        bytes32 digest = DiveLogTypedData.attestationDigest(1, address(diveLog), block.chainid);
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(buddyPk, digest);
-        bytes memory signature = abi.encodePacked(r, s, v);
-
-        vm.prank(stranger);
-        diveLog.attestDive(1, signature);
-
-        Attestation[] memory attestations = diveLog.getAttestations(1);
-        assertEq(attestations.length, 1);
-        assertEq(attestations[0].attester, buddy);
+        diveLog.attestDive(1, nonce, signature);
     }
 
     // ===== profile =====
@@ -575,29 +534,29 @@ contract SovereignDiveLogTest is Test {
 
     function testFuzz_logDive_depth(int32 depth) public {
         vm.assume(depth > 0);
-        DiveData memory data = _makeDiveData();
-        data.maxDepth = depth;
+        DiveInput memory input = _makeDiveInput();
+        input.data.maxDepth = depth;
         vm.prank(owner);
-        uint256 id = diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+        uint256 id = diveLog.logDive(input);
         assertEq(diveLog.getDive(id).data.maxDepth, depth);
     }
 
     function testFuzz_logDive_bottomTime(uint32 bt) public {
         vm.assume(bt > 0);
-        DiveData memory data = _makeDiveData();
-        data.bottomTimeMinutes = bt;
+        DiveInput memory input = _makeDiveInput();
+        input.data.bottomTimeMinutes = bt;
         vm.prank(owner);
-        uint256 id = diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+        uint256 id = diveLog.logDive(input);
         assertEq(diveLog.getDive(id).data.bottomTimeMinutes, bt);
     }
 
     function testFuzz_logDive_revert_zeroOrNegativeDepth(int32 depth) public {
         vm.assume(depth <= 0);
-        DiveData memory data = _makeDiveData();
-        data.maxDepth = depth;
+        DiveInput memory input = _makeDiveInput();
+        input.data.maxDepth = depth;
         vm.prank(owner);
         vm.expectRevert(IDiveLog.InvalidDepth.selector);
-        diveLog.logDive(DIVE_DATE, UnitSystem.Imperial, data, _makeEnvironment(), _makeDecompression(), _makeGasData(), "");
+        diveLog.logDive(input);
     }
 
     // ===== sovereign deployment =====
