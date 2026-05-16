@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 
 import "forge-std/Test.sol";
 import {SovereignDiveLog} from "../src/SovereignDiveLog.sol";
-import {UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, BiologicalSex, DiveData, Environment, Decompression, GasData, DiverProfile, DiveLog, DiveInput, VoidInfo, Attestation} from "../src/interfaces/IDiveLogTypes.sol";
+import {UnitSystem, DiveMode, BreathingGas, DivePurpose, SuitType, DecompressionType, DiveData, Environment, Decompression, GasData, DiveLog, DiveInput, VoidInfo, Attestation, BottomType, Coordinates} from "../src/interfaces/IDiveLogTypes.sol";
 import {IDiveLog} from "../src/interfaces/IDiveLog.sol";
 import {IERC165} from "../src/interfaces/IERC165.sol";
 import {DiveLogTypedData} from "../src/interfaces/IDiveLogTypedData.sol";
@@ -20,15 +20,7 @@ contract SovereignDiveLogTest is Test {
     function setUp() public {
         (buddy, buddyPk) = makeAddrAndKey("buddy");
         vm.prank(owner);
-        diveLog = new SovereignDiveLog(
-            owner,
-            "Test Diver",
-            30,
-            72,
-            185,
-            BiologicalSex.Male,
-            UnitSystem.Imperial
-        );
+        diveLog = new SovereignDiveLog(owner);
     }
 
     function _makeDiveData() internal pure returns (DiveData memory) {
@@ -52,8 +44,9 @@ contract SovereignDiveLogTest is Test {
                 airTemp: 72,
                 waterTemp: 58,
                 currentKnots: 1,
+                bottomType: BottomType.Silt,
+                coords: Coordinates(36888000, -76332000), // Scaled coordinates
                 location: "Naval Station Norfolk, Pier 3",
-                bottomType: "Mud/Silt",
                 weatherConditions: "Clear"
             });
     }
@@ -107,13 +100,6 @@ contract SovereignDiveLogTest is Test {
 
     function test_constructor() public view {
         assertEq(diveLog.owner(), owner);
-        DiverProfile memory p = diveLog.profile();
-        assertEq(p.name, "Test Diver");
-        assertEq(p.age, 30);
-        assertEq(p.height, 72);
-        assertEq(p.weight, 185);
-        assertEq(uint256(p.sex), uint256(BiologicalSex.Male));
-        assertEq(uint256(p.units), uint256(UnitSystem.Imperial));
     }
 
     // ===== logDive =====
@@ -157,13 +143,7 @@ contract SovereignDiveLogTest is Test {
         diveLog.logDive(input);
     }
 
-    function test_revert_negativeDepth() public {
-        DiveInput memory input = _makeDiveInput();
-        input.data.maxDepth = -10;
-        vm.prank(owner);
-        vm.expectRevert(IDiveLog.InvalidDepth.selector);
-        diveLog.logDive(input);
-    }
+
 
     function test_revert_zeroBottomTime() public {
         DiveInput memory input = _makeDiveInput();
@@ -583,54 +563,7 @@ contract SovereignDiveLogTest is Test {
         diveLog.attestDive(1, nonce, signature);
     }
 
-    // ===== profile =====
 
-    function test_updateProfile() public {
-        vm.prank(owner);
-        diveLog.updateProfile(
-            "Updated Name",
-            31,
-            73,
-            190,
-            BiologicalSex.Male,
-            UnitSystem.Metric
-        );
-
-        DiverProfile memory p = diveLog.profile();
-        assertEq(p.name, "Updated Name");
-        assertEq(p.age, 31);
-        assertEq(p.height, 73);
-        assertEq(p.weight, 190);
-        assertEq(uint256(p.sex), uint256(BiologicalSex.Male));
-        assertEq(uint256(p.units), uint256(UnitSystem.Metric));
-    }
-
-    function test_revert_updateProfile_notOwner() public {
-        vm.prank(stranger);
-        vm.expectRevert(IDiveLog.NotOwner.selector);
-        diveLog.updateProfile(
-            "Hacker",
-            99,
-            99,
-            99,
-            BiologicalSex.Unspecified,
-            UnitSystem.Imperial
-        );
-    }
-
-    function test_profile_emitsEvent() public {
-        vm.prank(owner);
-        vm.expectEmit(false, false, false, true);
-        emit IDiveLog.ProfileUpdated();
-        diveLog.updateProfile(
-            "Updated",
-            31,
-            73,
-            190,
-            BiologicalSex.Male,
-            UnitSystem.Metric
-        );
-    }
 
     // ===== supportsInterface =====
 
@@ -642,7 +575,7 @@ contract SovereignDiveLogTest is Test {
 
     // ===== fuzz tests =====
 
-    function testFuzz_logDive_depth(int32 depth) public {
+    function testFuzz_logDive_depth(uint32 depth) public {
         vm.assume(depth > 0);
         DiveInput memory input = _makeDiveInput();
         input.data.maxDepth = depth;
@@ -660,35 +593,15 @@ contract SovereignDiveLogTest is Test {
         assertEq(diveLog.getDive(id).data.bottomTimeMinutes, bt);
     }
 
-    function testFuzz_logDive_revert_zeroOrNegativeDepth(int32 depth) public {
-        vm.assume(depth <= 0);
-        DiveInput memory input = _makeDiveInput();
-        input.data.maxDepth = depth;
-        vm.prank(owner);
-        vm.expectRevert(IDiveLog.InvalidDepth.selector);
-        diveLog.logDive(input);
-    }
 
     // ===== sovereign deployment =====
 
     function test_sovereignDeployment() public {
         address diver = makeAddr("diver");
         vm.prank(diver);
-        SovereignDiveLog sovereign = new SovereignDiveLog(
-            diver,
-            "Jane Doe",
-            28,
-            165,
-            60,
-            BiologicalSex.Female,
-            UnitSystem.Metric
-        );
+        SovereignDiveLog sovereign = new SovereignDiveLog(diver);
 
         assertEq(sovereign.owner(), diver);
-
-        DiverProfile memory p = sovereign.profile();
-        assertEq(p.name, "Jane Doe");
-        assertEq(uint256(p.units), uint256(UnitSystem.Metric));
 
         assertTrue(sovereign.supportsInterface(type(IDiveLog).interfaceId));
     }

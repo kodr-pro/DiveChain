@@ -20,12 +20,6 @@ enum BreathingGas {
     Mixed
 }
 
-enum BiologicalSex {
-    Male,
-    Female,
-    Unspecified
-}
-
 enum DivePurpose {
     Training,
     Inspection,
@@ -59,13 +53,27 @@ enum DecompressionType {
     ExceptionalExposure
 }
 
+enum BottomType {
+    Sand,
+    Coral,
+    Rock,
+    Wreck,
+    Silt,
+    Other
+}
+
+struct Coordinates {
+    int32 latitude;
+    int32 longitude;
+}
+
 struct DiveData {
-    uint32 leaveSurfaceTime;
-    uint32 leaveBottomTime;
-    uint32 reachSurfaceTime;
+    uint64 leaveSurfaceTime;
+    uint64 leaveBottomTime;
+    uint64 reachSurfaceTime;
     uint32 bottomTimeMinutes;
-    int32 maxDepth;
-    int32 averageDepth;
+    uint32 maxDepth;
+    uint32 averageDepth;
     DiveMode mode;
     DivePurpose purpose;
     SuitType suit;
@@ -75,8 +83,9 @@ struct Environment {
     int32 airTemp;
     int32 waterTemp;
     int16 currentKnots;
+    BottomType bottomType;
+    Coordinates coords;
     string location;
-    string bottomType;
     string weatherConditions;
 }
 
@@ -99,15 +108,6 @@ struct GasData {
     uint32 cylinderPressureOut;
     uint32 gasConsumed;
     uint32 bailoutPressure;
-}
-
-struct DiverProfile {
-    string name;
-    uint8 age;
-    uint16 height;
-    uint16 weight;
-    BiologicalSex sex;
-    UnitSystem units;
 }
 
 struct DiveInput {
@@ -142,4 +142,5 @@ struct VoidInfo {
 struct Attestation {
     address attester;
     uint64 attestedAt;
+    uint256 nonce;
 }
